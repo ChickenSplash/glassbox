@@ -225,7 +225,7 @@ h1 { font-size: clamp(2.2rem, 4.6vw, 3.6rem); line-height: 1.08; font-weight: 70
 .how { display: grid; gap: 14px; margin: 0; padding: 0; list-style: none; }
 .how li { color: var(--muted); }
 .how strong { color: var(--text); font-weight: 600; }
-.spec { margin-top: 28px; font: 400 13px/1.8 "JetBrains Mono", monospace; color: var(--muted); }
+.spec { margin-top: 28px; text-align: center; font: 400 13px/1.8 "JetBrains Mono", monospace; color: var(--muted); }
 
 footer {
   display: flex;
