@@ -32,38 +32,37 @@
     <section class="hero">
       <p class="status" data-state="connecting"><span class="dot"></span><span id="conn">Connecting to the homelab...</span></p>
       <h1>This page is the server.<br><span class="muted">Live from a cupboard in Norfolk.</span></h1>
-      <p class="lead">
-        A palm-sized Dell OptiPlex under my router hosts my portfolio and side projects.
-        Below is btop running on it right now, mirrored to your browser as it draws.
-      </p>
-      <dl class="facts">
-        <div><dt>Uptime</dt><dd id="uptime">·</dd></div>
-        <div><dt>Watching now</dt><dd id="watching">·</dd></div>
-        <div><dt>Portfolio requests</dt><dd id="requests">·</dd></div>
-        <div><dt>Last minute</dt><dd id="rpm">·</dd></div>
-      </dl>
+      <div class="intro">
+        <p class="lead">
+          A palm-sized Dell OptiPlex under my router hosts my portfolio and side projects.
+          Below is btop running on it right now, mirrored to your browser as it draws.
+        </p>
+        <dl class="facts">
+          <div><dt>Uptime</dt><dd id="uptime">·</dd></div>
+          <div><dt>Watching now</dt><dd id="watching">·</dd></div>
+          <div><dt>Portfolio requests</dt><dd id="requests">·</dd></div>
+          <div><dt>Last minute</dt><dd id="rpm">·</dd></div>
+        </dl>
+      </div>
     </section>
 
     <section class="stage" aria-label="btop, live from the homelab">
       <div class="window">
-        <div class="titlebar">
-          <span class="lights" aria-hidden="true"><i></i><i></i><i></i></span>
-          <span class="title">ecorreia@homelab: btop</span>
-          <span class="badge" id="btop-state">view only</span>
-        </div>
         <div class="term" id="term"></div>
       </div>
     </section>
 
-    <section>
-      <h2>Containers</h2>
-      <ul class="rows" id="containers"><li class="empty muted">Waiting for Docker...</li></ul>
-    </section>
+    <div class="columns">
+      <section>
+        <h2>Containers</h2>
+        <ul class="rows" id="containers"><li class="empty muted">Waiting for Docker...</li></ul>
+      </section>
 
-    <section>
-      <h2>Recent commits</h2>
-      <ul class="rows" id="commits"><li class="empty muted">Reading git history...</li></ul>
-    </section>
+      <section>
+        <h2>Recent commits</h2>
+        <ul class="rows" id="commits"><li class="empty muted">Reading git history...</li></ul>
+      </section>
+    </div>
 
     <section>
       <h2>How this works</h2>

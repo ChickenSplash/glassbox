@@ -51,8 +51,6 @@ const decode = (base64) => Uint8Array.from(atob(base64), (c) => c.charCodeAt(0))
 
 const FONT = '"JetBrains Mono", ui-monospace, monospace';
 const box = $("term");
-const stage = document.querySelector(".stage");
-const frame = document.querySelector(".window");
 let term = null;
 
 // Pick the font size that makes btop's fixed number of columns fill the frame. Cells
@@ -60,11 +58,12 @@ let term = null;
 // what actually rendered, then step down until it fits.
 function fit() {
   if (!term) return;
-  // Measured from the stage, since the window is sized to the terminal
-  const pad = parseFloat(getComputedStyle(box).paddingLeft);
-  const border = frame.offsetWidth - frame.clientWidth;
-  const width = stage.clientWidth - border - pad * 2;
-  const rendered = () => box.querySelector(".xterm-screen").getBoundingClientRect().width;
+  // The window always spans the page column, so its edges line up with the content
+  const pad = parseFloat(getComputedStyle(root).getPropertyValue("--term-pad"));
+  const width = box.clientWidth - pad * 2;
+  const screen = box.querySelector(".xterm-screen");
+  // offsetWidth ignores the scale applied below, so this is the size xterm drew at
+  const rendered = () => screen.offsetWidth;
   const round = (n) => Math.floor(n * 10) / 10;
 
   for (let i = 0; i < 3; i++) {
@@ -76,16 +75,18 @@ function fit() {
     term.options.fontSize = round(term.options.fontSize - 0.1);
   }
 
-  // Wrap the window tightly round what rendered, so the padding is even on every side.
-  // btop's outer border runs through the middle of the edge cells, and cells are
-  // taller than wide, so the top and bottom padding give back the difference.
-  const screen = box.querySelector(".xterm-screen").getBoundingClientRect();
-  const cellW = screen.width / term.cols;
-  const cellH = screen.height / term.rows;
-  const padY = Math.max(0, pad - (cellH - cellW) / 2);
+  // With 120 columns, whole-pixel cells leave up to 120px spare. Scale the last bit
+  // so btop fills the window exactly. btop's outer border runs through the middle of
+  // the edge cells, and cells are taller than wide, so the top and bottom padding give
+  // back the difference and the gap looks even all round.
+  const scale = width / rendered();
+  const w = rendered() * scale;
+  const h = screen.offsetHeight * scale;
+  const padY = Math.max(0, pad - (h / term.rows - w / term.cols) / 2);
+  screen.style.transformOrigin = "0 0";
+  screen.style.transform = `scale(${scale})`;
   box.style.padding = `${padY}px ${pad}px`;
-  box.style.height = `${screen.height + padY * 2}px`;
-  frame.style.width = `${screen.width + pad * 2 + border}px`;
+  box.style.height = `${h + padY * 2}px`;
 }
 
 async function createTerm(cols, rows) {
@@ -114,11 +115,16 @@ async function createTerm(cols, rows) {
   fit();
 }
 
+// Only width matters: fit() sets the height itself
 let resizeTimer;
-new ResizeObserver(() => {
+let lastWidth = 0;
+new ResizeObserver(([entry]) => {
+  const width = entry.contentRect.width;
+  if (width === lastWidth) return;
+  lastWidth = width;
   clearTimeout(resizeTimer);
   resizeTimer = setTimeout(fit, 100);
-}).observe(stage);
+}).observe(document.querySelector(".stage"));
 
 // The server sends the homelab's palette as CSS; swapping it in recolours the page
 function applyTheme(css) {
@@ -139,7 +145,6 @@ function applyTheme(css) {
 function renderTick(t) {
   $("uptime").textContent = uptime(t.uptime);
   $("watching").textContent = t.watching === 1 ? "1 (just you)" : t.watching;
-  $("btop-state").textContent = t.btop ? "view only" : "btop restarting...";
 }
 
 function renderInfo(info) {

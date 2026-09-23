@@ -95,7 +95,7 @@ function paletteCss(p) {
     `--glow: color-mix(in srgb, ${c.primary} ${dark ? 18 : 12}%, transparent)`,
   ].join("; ");
   const t = p.colors[p.mode || "dark"];
-  const term = `--term-bg: ${t.background}; --term-fg: ${t.on_background}; --term-dim: ${t.surface_container_highest}`;
+  const term = `--term-bg: ${t.background}; --term-fg: ${t.on_background}; --term-a: ${t.primary}; --term-b: ${t.secondary}`;
   const dark = vars(p.colors.dark, true);
   return [
     `:root { ${vars(p.colors.light, false)}; ${term}; color-scheme: light }`,
