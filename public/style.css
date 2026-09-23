@@ -17,8 +17,8 @@
   --term-bg: #100400;
   --term-pad: 14px;
   --term-border: 2px;
-  --term-a: #a22933;
-  --term-b: #d36e26;
+  --term-a: #d36e26;
+  --term-b: #a22933;
   color-scheme: light;
 }
 
@@ -180,7 +180,7 @@ h1 { font-size: clamp(2.2rem, 4.6vw, 3.6rem); line-height: 1.08; font-weight: 70
 .window {
   padding: var(--term-border);
   border-radius: 12px;
-  background: linear-gradient(45deg, var(--term-a), var(--term-b));
+  background: linear-gradient(to bottom, var(--term-a), var(--term-b));
   box-shadow: 0 20px 50px -20px rgba(0, 0, 0, .55);
 }
 .term {

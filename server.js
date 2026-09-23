@@ -95,7 +95,11 @@ function paletteCss(p) {
     `--glow: color-mix(in srgb, ${c.primary} ${dark ? 18 : 12}%, transparent)`,
   ].join("; ");
   const t = p.colors[p.mode || "dark"];
-  const term = `--term-bg: ${t.background}; --term-fg: ${t.on_background}; --term-a: ${t.primary}; --term-b: ${t.secondary}`;
+  // The window border fades from the lighter of the two accents at the top, where the
+  // page's glow is, to the darker at the bottom
+  const luma = (hex) => [1, 3, 5].reduce((sum, i, k) => sum + parseInt(hex.slice(i, i + 2), 16) * [0.2126, 0.7152, 0.0722][k], 0);
+  const [lighter, darker] = [t.primary, t.secondary].sort((a, b) => luma(b) - luma(a));
+  const term = `--term-bg: ${t.background}; --term-fg: ${t.on_background}; --term-a: ${lighter}; --term-b: ${darker}`;
   const dark = vars(p.colors.dark, true);
   return [
     `:root { ${vars(p.colors.light, false)}; ${term}; color-scheme: light }`,
