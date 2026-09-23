@@ -81,31 +81,27 @@ function flushTerm() {
 // ---------------------------------------------------------------- theme
 
 // The homelab's central palette (theme-apply writes palette.json), turned into the
-// page's CSS variables. The terminal stays in btop's own mode; the page follows the
-// visitor's light or dark preference.
+// page's CSS variables. The page is dark only; the terminal follows btop's own mode.
 function paletteCss(p) {
-  const vars = (c, dark) => [
-    `--bg: ${c.background}`,
-    `--surface: ${dark ? c.surface_container : `color-mix(in srgb, ${c.background} 40%, #fff)`}`,
-    `--text: color-mix(in srgb, ${c.on_background} ${dark ? 55 : 45}%, ${dark ? "#fff" : "#000"})`,
-    `--muted: ${dark ? `color-mix(in srgb, ${c.on_background} 80%, ${c.background})` : c.on_background}`,
-    `--border: color-mix(in srgb, ${c.outline} 35%, ${c.background})`,
-    `--accent: ${c.primary}`,
-    `--accent-text: ${c.on_primary}`,
-    `--glow: color-mix(in srgb, ${c.primary} ${dark ? 18 : 12}%, transparent)`,
-  ].join("; ");
+  const c = p.colors.dark;
   const t = p.colors[p.mode || "dark"];
   // The window border fades from the lighter of the two accents at the top, where the
   // page's glow is, to the darker at the bottom
   const luma = (hex) => [1, 3, 5].reduce((sum, i, k) => sum + parseInt(hex.slice(i, i + 2), 16) * [0.2126, 0.7152, 0.0722][k], 0);
   const [lighter, darker] = [t.primary, t.secondary].sort((a, b) => luma(b) - luma(a));
-  const term = `--term-bg: ${t.background}; --term-fg: ${t.on_background}; --term-a: ${lighter}; --term-b: ${darker}`;
-  const dark = vars(p.colors.dark, true);
-  return [
-    `:root { ${vars(p.colors.light, false)}; ${term}; color-scheme: light }`,
-    `@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { ${dark}; color-scheme: dark } }`,
-    `:root[data-theme="dark"] { ${dark}; color-scheme: dark }`,
-  ].join("\n");
+  const vars = [
+    `--bg: ${c.background}`,
+    `--surface: ${c.surface_container}`,
+    `--text: color-mix(in srgb, ${c.on_background} 55%, #fff)`,
+    `--muted: color-mix(in srgb, ${c.on_background} 80%, ${c.background})`,
+    `--border: color-mix(in srgb, ${c.outline} 35%, ${c.background})`,
+    `--accent: ${c.primary}`,
+    `--glow: color-mix(in srgb, ${c.primary} 18%, transparent)`,
+    `--term-bg: ${t.background}`,
+    `--term-a: ${lighter}`,
+    `--term-b: ${darker}`,
+  ];
+  return `:root { ${vars.join("; ")} }`;
 }
 
 let themeCss = "";

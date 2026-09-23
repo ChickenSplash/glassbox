@@ -1,14 +1,5 @@
 const root = document.documentElement;
-const media = matchMedia("(prefers-color-scheme: dark)");
 const $ = (id) => document.getElementById(id);
-
-// Theme toggle: flips whatever is currently showing and remembers the choice
-document.querySelector(".theme-toggle").addEventListener("click", () => {
-  const current = root.dataset.theme || (media.matches ? "dark" : "light");
-  const next = current === "dark" ? "light" : "dark";
-  root.dataset.theme = next;
-  try { localStorage.setItem("theme", next); } catch (e) {}
-});
 
 $("year").textContent = new Date().getFullYear();
 
