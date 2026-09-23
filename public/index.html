@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Glass box · Emanuel Correia's homelab, live</title>
+  <meta name="description" content="Live vitals from the small server in Emanuel Correia's cupboard that hosts his portfolio and side projects.">
+  <meta name="color-scheme" content="light dark">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%23111'/><text x='16' y='22' font-family='system-ui' font-size='15' font-weight='700' fill='%23fff' text-anchor='middle'>EC</text></svg>">
+  <script src="theme.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="nav">
+    <a class="logo" href="https://portfolio.chickensplash.dpdns.org" aria-label="Portfolio">EC</a>
+    <nav>
+      <a href="https://portfolio.chickensplash.dpdns.org">Portfolio</a>
+      <a href="https://github.com/ChickenSplash/glassbox" target="_blank" rel="noopener">Source ↗</a>
+    </nav>
+    <button class="theme-toggle" type="button" aria-label="Toggle light and dark mode">
+      <svg class="icon-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+      <svg class="icon-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg>
+    </button>
+  </header>
+
+  <main>
+    <section class="hero">
+      <p class="status" data-state="connecting"><span class="dot"></span><span id="conn">Connecting to the homelab...</span></p>
+      <h1>This page is the server.<br><span class="muted">Live from a cupboard in Norfolk.</span></h1>
+      <p class="lead">
+        A palm-sized Dell OptiPlex under my router hosts my portfolio and side projects.
+        Everything below is read off it and streamed to you once a second.
+      </p>
+      <dl class="facts">
+        <div><dt>Uptime</dt><dd id="uptime">·</dd></div>
+        <div><dt>Watching now</dt><dd id="watching">·</dd></div>
+        <div><dt>Load average</dt><dd id="load">·</dd></div>
+      </dl>
+    </section>
+
+    <section>
+      <h2>Vitals</h2>
+      <div class="grid">
+        <article class="card">
+          <header><span>CPU</span><strong id="cpu">·</strong></header>
+          <canvas class="spark" data-series="cpu"></canvas>
+          <div class="cores" id="cores" aria-label="Per-core usage"></div>
+        </article>
+        <article class="card">
+          <header><span>Memory</span><strong id="mem">·</strong></header>
+          <canvas class="spark" data-series="mem"></canvas>
+          <p class="sub" id="mem-sub">·</p>
+        </article>
+        <article class="card">
+          <header><span>CPU temperature</span><strong id="temp">·</strong></header>
+          <canvas class="spark" data-series="temp"></canvas>
+          <p class="sub">Throttles at 100 °C</p>
+        </article>
+        <article class="card">
+          <header><span>Network</span><strong id="net">·</strong></header>
+          <canvas class="spark" data-series="net"></canvas>
+          <p class="sub"><span class="key in"></span>In <span id="rx">·</span> <span class="key out"></span>Out <span id="tx">·</span></p>
+        </article>
+        <article class="card">
+          <header><span>Disk</span><strong id="disk">·</strong></header>
+          <div class="bar"><span id="disk-bar"></span></div>
+          <p class="sub" id="disk-sub">·</p>
+        </article>
+        <article class="card">
+          <header><span>Portfolio traffic</span><strong id="rpm">·</strong></header>
+          <p class="big-num" id="requests">·</p>
+          <p class="sub">requests served since the glass box last restarted</p>
+        </article>
+      </div>
+    </section>
+
+    <section>
+      <h2>Containers</h2>
+      <ul class="rows" id="containers"><li class="empty muted">Waiting for Docker...</li></ul>
+    </section>
+
+    <section>
+      <h2>Recent commits</h2>
+      <ul class="rows" id="commits"><li class="empty muted">Reading git history...</li></ul>
+    </section>
+
+    <section>
+      <h2>How this works</h2>
+      <ul class="how">
+        <li><strong>One sampler, many viewers.</strong> A small Node.js service with no dependencies reads <code>/proc</code> and <code>/sys</code> once a second and fans the same frame out to everyone over Server-Sent Events.</li>
+        <li><strong>Drawn by hand.</strong> No chart library: the graphs are plain <code>&lt;canvas&gt;</code>, scrolling smoothly between samples.</li>
+        <li><strong>Locked down.</strong> The container is read-only with no Linux capabilities, and it only sees Docker through a proxy that allows two read-only calls.</li>
+        <li><strong>No open ports.</strong> Traffic reaches the box through an outbound Cloudflare tunnel. No cookies, no analytics, nothing stored about you.</li>
+      </ul>
+      <p class="spec">Dell OptiPlex 3060 Micro · Intel Core i5-8500T, 6 cores · 8 GB DDR4 · 250 GB SSD · CachyOS Linux · Docker</p>
+    </section>
+  </main>
+
+  <footer>
+    <span>© <span id="year"></span> Emanuel Correia</span>
+    <span class="muted">Self-hosted in Norfolk</span>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>

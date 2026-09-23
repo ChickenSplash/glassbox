@@ -1,0 +1,55 @@
+services:
+  app:
+    build: .
+    container_name: glassbox
+    hostname: glassbox
+    init: true
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges]
+    mem_limit: 128m
+    environment:
+      NET_IFACE: enp1s0
+      # Only public repos: commit messages are shown on the page
+      REPOS: glassbox=ChickenSplash/glassbox,projects-panel=ChickenSplash/projects-panel
+    volumes:
+      # The host's network counters. /proc/stat, meminfo, loadavg and uptime are already
+      # host-wide inside a container, the network ones are not.
+      - /proc/1/net/dev:/host/netdev:ro
+      # Just the .git dirs, so no working tree (or .env) is visible
+      - ./.git:/repos/glassbox:ro
+      - ../projects-panel/.git:/repos/projects-panel:ro
+    networks: [edge, docker-proxy]
+    depends_on: [socket-proxy]
+    restart: unless-stopped
+
+  # Filters the Docker socket down to listing containers and reading their stats
+  socket-proxy:
+    image: wollomatic/socket-proxy:1
+    container_name: glassbox-socket-proxy
+    user: "65534:961"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges]
+    mem_limit: 32m
+    command:
+      - -listenip=0.0.0.0
+      - -allowfrom=glassbox
+      - -allowGET=/(v1\.[0-9]+/)?containers/(json|[0-9a-f]{64}/stats)
+      - -watchdoginterval=3600
+      - -stoponwatchdog
+      - -shutdowngracetime=5
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks: [docker-proxy]
+    restart: unless-stopped
+
+networks:
+  # Created by the cloudflared stack. Point the tunnel's public hostname at
+  # http://glassbox:8080, cloudflared resolves that name on this network.
+  edge:
+    name: edge
+    external: true
+  # No route out and nothing else on it: only glassbox can reach the proxy
+  docker-proxy:
+    internal: true
