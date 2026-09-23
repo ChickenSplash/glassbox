@@ -1,0 +1,4 @@
+#!/bin/sh
+# socat's pty starts with no size, and the page mirrors it cell for cell
+stty rows "${BTOP_ROWS:-34}" cols "${BTOP_COLS:-120}"
+exec btop --utf-force

@@ -1,3 +1,8 @@
+x-btop-size: &btop-size
+  # The page mirrors btop cell for cell, so both sides need the same size
+  BTOP_COLS: "120"
+  BTOP_ROWS: "34"
+
 services:
   app:
     build: .
@@ -9,18 +14,38 @@ services:
     security_opt: [no-new-privileges]
     mem_limit: 128m
     environment:
-      NET_IFACE: enp1s0
+      <<: *btop-size
       # Only public repos: commit messages are shown on the page
       REPOS: glassbox=ChickenSplash/glassbox,projects-panel=ChickenSplash/projects-panel
     volumes:
-      # The host's network counters. /proc/stat, meminfo, loadavg and uptime are already
-      # host-wide inside a container, the network ones are not.
-      - /proc/1/net/dev:/host/netdev:ro
+      - btop-socket:/run/btop
       # Just the .git dirs, so no working tree (or .env) is visible
       - ./.git:/repos/glassbox:ro
       - ../projects-panel/.git:/repos/projects-panel:ro
     networks: [edge, docker-proxy]
-    depends_on: [socket-proxy]
+    depends_on: [socket-proxy, btop]
+    restart: unless-stopped
+
+  # btop on a pty, served over a unix socket that only the app container mounts.
+  # Host networking so its network box sees the real NIC; it opens no ports.
+  btop:
+    build: ./btop
+    container_name: glassbox-btop
+    network_mode: host
+    init: true
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges]
+    mem_limit: 64m
+    environment:
+      <<: *btop-size
+      TZ: Europe/London
+    tmpfs: [/tmp]
+    volumes:
+      - btop-socket:/run/btop
+      # The homelab's complemented theme, kept current by dms-btop-theme-homelab
+      # Inside btop's own config dir, the only place it looks for user themes
+      - /home/ecorreia/.config/btop/themes:/etc/glassbox/btop/themes:ro
     restart: unless-stopped
 
   # Filters the Docker socket down to listing containers and reading their stats
@@ -43,6 +68,9 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     networks: [docker-proxy]
     restart: unless-stopped
+
+volumes:
+  btop-socket:
 
 networks:
   # Created by the cloudflared stack. Point the tunnel's public hostname at

@@ -1,6 +1,5 @@
 const root = document.documentElement;
 const media = matchMedia("(prefers-color-scheme: dark)");
-const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
 const $ = (id) => document.getElementById(id);
 
 // Theme toggle: flips whatever is currently showing and remembers the choice
@@ -21,8 +20,6 @@ function bytes(n, digits = 1) {
   while (n >= 1000 && i < units.length - 1) { n /= 1000; i++; }
   return `${n.toFixed(i === 0 ? 0 : digits)} ${units[i]}`;
 }
-
-const rate = (n) => `${bytes(n)}/s`;
 
 function uptime(seconds) {
   const d = Math.floor(seconds / 86400);
@@ -48,143 +45,78 @@ function el(tag, className, text) {
   return node;
 }
 
-// ---------------------------------------------------------------- charts
+const decode = (base64) => Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
 
-let history = [];
-let historySize = 120;
-let lastTickAt = performance.now();
+// ---------------------------------------------------------------- terminal
 
-const charts = {
-  cpu: () => ({ lines: [{ values: history.map((p) => p.cpu), color: "--accent" }], min: 0, max: 100 }),
-  mem: () => ({ lines: [{ values: history.map((p) => p.mem), color: "--accent" }], min: 0, max: 100 }),
-  temp: () => {
-    const values = history.map((p) => p.temp);
-    return { lines: [{ values, color: "--accent" }], min: 25, max: Math.max(60, ...values.filter(Number.isFinite)) + 5 };
-  },
-  net: () => {
-    const rx = history.map((p) => p.rx);
-    const tx = history.map((p) => p.tx);
-    return {
-      lines: [{ values: rx, color: "--accent" }, { values: tx, color: "--accent-2", fill: false }],
-      min: 0,
-      max: Math.max(10_000, ...rx, ...tx) * 1.15,
-    };
-  },
-};
+const FONT = '"JetBrains Mono", ui-monospace, monospace';
+const box = $("term");
+let term = null;
 
-function draw(canvas, { lines, min, max }, style) {
-  const dpr = window.devicePixelRatio || 1;
-  const w = canvas.clientWidth;
-  const h = canvas.clientHeight;
-  if (canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr)) {
-    canvas.width = Math.round(w * dpr);
-    canvas.height = Math.round(h * dpr);
+// Pick the font size that makes btop's fixed number of columns fill the frame. Cells
+// snap to whole device pixels, so width is not proportional to font size: scale from
+// what actually rendered, then step down until it fits.
+function fit() {
+  if (!term) return;
+  const style = getComputedStyle(box);
+  const width = box.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+  const rendered = () => box.querySelector(".xterm-screen").getBoundingClientRect().width;
+  const round = (n) => Math.floor(n * 10) / 10;
+
+  for (let i = 0; i < 3; i++) {
+    const size = round(term.options.fontSize * (width / rendered()));
+    if (!Number.isFinite(size) || size === term.options.fontSize) break;
+    term.options.fontSize = size;
   }
-  const ctx = canvas.getContext("2d");
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  ctx.clearRect(0, 0, w, h);
-
-  // Faint guide lines at a quarter, half and three quarters
-  ctx.strokeStyle = style.getPropertyValue("--border");
-  ctx.lineWidth = 1;
-  ctx.setLineDash([2, 4]);
-  for (const f of [0.25, 0.5, 0.75]) {
-    ctx.beginPath();
-    ctx.moveTo(0, Math.round(h * f) + 0.5);
-    ctx.lineTo(w, Math.round(h * f) + 0.5);
-    ctx.stroke();
-  }
-  ctx.setLineDash([]);
-
-  // Points slide left between samples, so the chart scrolls instead of jumping
-  const right = w - 4;
-  const slot = right / (historySize - 2);
-  const offset = reducedMotion.matches ? 0 : Math.min(1, (performance.now() - lastTickAt) / 1000);
-  const x = (i, n) => right - (n - 1 - i + offset) * slot;
-  const y = (v) => h - 3 - ((Math.min(max, Math.max(min, v)) - min) / (max - min)) * (h - 8);
-
-  for (const line of lines) {
-    const n = line.values.length;
-    const points = line.values.map((v, i) => [x(i, n), y(v)]).filter((_, i) => Number.isFinite(line.values[i]));
-    if (points.length < 2) continue;
-    const color = style.getPropertyValue(line.color).trim();
-
-    ctx.beginPath();
-    points.forEach(([px, py], i) => (i ? ctx.lineTo(px, py) : ctx.moveTo(px, py)));
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 1.75;
-    ctx.lineJoin = "round";
-    ctx.stroke();
-
-    if (line.fill !== false) {
-      ctx.lineTo(points.at(-1)[0], h);
-      ctx.lineTo(points[0][0], h);
-      ctx.closePath();
-      const gradient = ctx.createLinearGradient(0, 0, 0, h);
-      gradient.addColorStop(0, color + "40");
-      gradient.addColorStop(1, color + "00");
-      ctx.fillStyle = gradient;
-      ctx.fill();
-    }
-
-    const [lx, ly] = points.at(-1);
-    ctx.beginPath();
-    ctx.arc(lx, ly, 2.75, 0, Math.PI * 2);
-    ctx.fillStyle = color;
-    ctx.fill();
+  while (rendered() > width && term.options.fontSize > 4) {
+    term.options.fontSize = round(term.options.fontSize - 0.1);
   }
 }
 
-const canvases = [...document.querySelectorAll(".spark")];
-function frame() {
-  if (history.length) {
-    const style = getComputedStyle(root);
-    for (const canvas of canvases) draw(canvas, charts[canvas.dataset.series](), style);
-  }
-  requestAnimationFrame(frame);
+async function createTerm(cols, rows) {
+  // xterm measures the font once when it opens, so it has to be loaded first
+  await Promise.all(["400", "700"].map((w) => document.fonts.load(`${w} 16px "JetBrains Mono"`)));
+  term = new Terminal({
+    cols,
+    rows,
+    fontFamily: FONT,
+    fontSize: 12,
+    lineHeight: 1,
+    scrollback: 0,
+    disableStdin: true,
+    cursorInactiveStyle: "none",
+    theme: { background: getComputedStyle(root).getPropertyValue("--term-bg").trim() },
+  });
+  term.open(box);
+
+  // WebGL keeps every glyph in its own cell, which matters for btop's braille graphs:
+  // few fonts have braille, and a fallback font's wider dots would push the grid out
+  try {
+    const webgl = new WebglAddon.WebglAddon();
+    webgl.onContextLoss(() => webgl.dispose());
+    term.loadAddon(webgl);
+  } catch (e) {}
+  fit();
 }
-requestAnimationFrame(frame);
+
+let resizeTimer;
+new ResizeObserver(() => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(fit, 100);
+}).observe(box);
 
 // ---------------------------------------------------------------- rendering
 
 function renderTick(t) {
   $("uptime").textContent = uptime(t.uptime);
   $("watching").textContent = t.watching === 1 ? "1 (just you)" : t.watching;
-  $("load").textContent = t.load.map((n) => n.toFixed(2)).join("  ");
-
-  $("cpu").textContent = `${Math.round(t.cpu)}%`;
-  const cores = $("cores");
-  if (cores.children.length !== t.cores.length) {
-    cores.replaceChildren(...t.cores.map(() => el("span")));
-  }
-  t.cores.forEach((v, i) => {
-    cores.children[i].style.setProperty("--v", `${v}%`);
-    cores.children[i].title = `Core ${i}: ${Math.round(v)}%`;
-  });
-
-  $("mem").textContent = bytes(t.mem.used);
-  $("mem-sub").textContent = `of ${bytes(t.mem.total)}, ${Math.round((t.mem.used / t.mem.total) * 100)}% in use`;
-
-  const temp = $("temp");
-  temp.textContent = t.temp === null ? "n/a" : `${Math.round(t.temp)} °C`;
-  temp.style.color = t.temp >= 85 ? "var(--bad)" : t.temp >= 70 ? "var(--warn)" : "";
-
-  $("net").textContent = rate(t.net.rx + t.net.tx);
-  $("rx").textContent = rate(t.net.rx);
-  $("tx").textContent = rate(t.net.tx);
+  $("btop-state").textContent = t.btop ? "view only" : "btop restarting...";
 }
 
 function renderInfo(info) {
-  if (info.disk) {
-    const pct = (info.disk.used / info.disk.total) * 100;
-    $("disk").textContent = `${Math.round(pct)}%`;
-    $("disk-bar").style.width = `${pct}%`;
-    $("disk-sub").textContent = `${bytes(info.disk.used)} of ${bytes(info.disk.total, 0)} used`;
-  }
-
   if (info.traffic) {
-    $("rpm").textContent = `${info.traffic.perMinute}/min`;
     $("requests").textContent = info.traffic.requests.toLocaleString("en-GB");
+    $("rpm").textContent = `${info.traffic.perMinute} req`;
   }
 
   if (info.containers.length) {
@@ -219,27 +151,46 @@ function setStatus(state, text) {
   $("conn").textContent = text;
 }
 
-const source = new EventSource("/events");
+let ready = null;
 
-source.addEventListener("init", (event) => {
-  const data = JSON.parse(event.data);
-  history = data.history;
-  historySize = data.historySize;
-  lastTickAt = performance.now();
-  if (data.latest) renderTick(data.latest);
-  renderInfo(data.info);
-  setStatus("live", "Live · streaming from the homelab");
-});
+function connect() {
+  const source = new EventSource("/events");
 
-source.addEventListener("tick", (event) => {
-  const t = JSON.parse(event.data);
-  history.push({ t: t.t, cpu: t.cpu, mem: (t.mem.used / t.mem.total) * 100, temp: t.temp, rx: t.net.rx, tx: t.net.tx });
-  if (history.length > historySize) history.shift();
-  lastTickAt = performance.now();
-  renderTick(t);
-});
+  source.addEventListener("init", (event) => {
+    const data = JSON.parse(event.data);
+    renderTick(data.tick);
+    renderInfo(data.info);
+    setStatus("live", "Live · streaming from the homelab");
 
-source.addEventListener("info", (event) => renderInfo(JSON.parse(event.data)));
+    // On a reconnect the old screen is replaced by the fresh snapshot
+    ready = (async () => {
+      if (!term) await createTerm(data.cols, data.rows);
+      else term.resize(data.cols, data.rows);
+      term.reset();
+      term.write(decode(data.screen));
+    })();
+  });
 
-// EventSource retries by itself; this only tells the visitor what is going on
-source.addEventListener("error", () => setStatus("down", "Connection lost · retrying..."));
+  source.addEventListener("term", async (event) => {
+    if (!ready) return;
+    await ready;
+    term.write(decode(event.data));
+  });
+
+  source.addEventListener("tick", (event) => renderTick(JSON.parse(event.data)));
+  source.addEventListener("info", (event) => renderInfo(JSON.parse(event.data)));
+
+  source.addEventListener("error", () => {
+    ready = null;
+    if (source.readyState === EventSource.CLOSED) {
+      // Turned away (too many viewers, or the box is down): EventSource gives up
+      // on a non-200 answer, so start again later
+      setStatus("down", "Can't reach the homelab · trying again shortly...");
+      setTimeout(connect, 30_000);
+    } else {
+      setStatus("down", "Connection lost · retrying...");
+    }
+  });
+}
+
+connect();

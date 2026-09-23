@@ -1,11 +1,15 @@
 # Glass box
 
-A live page showing the vitals of the homelab that serves it: CPU, memory, temperature,
-network, disk, containers, portfolio traffic and recent commits, streamed once a second.
+A live page for the homelab that serves it: the real btop, mirrored to every visitor,
+plus its containers, portfolio traffic and recent commits.
 
-- **Backend:** Node.js 22, no dependencies. One sampler reads `/proc` and `/sys` every
-  second and fans the same frame out to every viewer over Server-Sent Events.
-- **Frontend:** plain HTML, CSS and JavaScript. Charts are hand-drawn on `<canvas>`.
+- **btop:** runs in its own container on a pty (via `socat`) and is served over a unix
+  socket that only the app mounts. Host networking so its net box sees the real NIC.
+  The process box is off, and IPv4 addresses are masked before anything leaves the box.
+- **App:** Node.js 22. One connection to btop, fanned out to every viewer over
+  Server-Sent Events, gzip-flushed per frame. A headless xterm.js keeps a copy of the
+  screen so new viewers start from the current picture.
+- **Frontend:** plain HTML, CSS and JavaScript, with xterm.js and its WebGL renderer.
 - **Docker:** reached only through [wollomatic/socket-proxy](https://github.com/wollomatic/socket-proxy),
   allowlisted to listing containers and reading their stats.
 - **Traffic:** the portfolio's nginx `stub_status`, on a port only the Docker network can reach.

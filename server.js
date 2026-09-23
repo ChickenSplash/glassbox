@@ -1,18 +1,24 @@
 "use strict";
 
-// Glass box: reads the homelab's vitals once a second and streams them to every
-// open page over Server-Sent Events. One sampler, many viewers, no dependencies.
+// Glass box: mirrors one btop screen from the homelab to every open page over
+// Server-Sent Events, alongside its containers, portfolio traffic and recent commits.
 
 const http = require("node:http");
+const crypto = require("node:crypto");
+const net = require("node:net");
+const zlib = require("node:zlib");
 const fs = require("node:fs");
 const path = require("node:path");
 const { execFile } = require("node:child_process");
+const { Terminal } = require("@xterm/headless");
+const { SerializeAddon } = require("@xterm/addon-serialize");
 
 const PORT = Number(process.env.PORT || 8080);
 const DOCKER = process.env.DOCKER_PROXY || "http://socket-proxy:2375";
 const NGINX_STATUS = process.env.NGINX_STATUS || "http://portfolio:8081/nginx_status";
-const NET_DEV = process.env.NET_DEV || "/host/netdev";
-const NET_IFACE = process.env.NET_IFACE || "enp1s0";
+const BTOP_SOCKET = process.env.BTOP_SOCKET || "/run/btop/btop.sock";
+const COLS = Number(process.env.BTOP_COLS || 120);
+const ROWS = Number(process.env.BTOP_ROWS || 34);
 const REPO_DIR = process.env.REPO_DIR || "/repos";
 // "name=owner/repo,..." : /repos/<name> is the mounted .git dir, owner/repo its GitHub slug
 const REPOS = (process.env.REPOS || "")
@@ -23,64 +29,51 @@ const REPOS = (process.env.REPOS || "")
     return { name, slug, dir: path.join(REPO_DIR, name) };
   });
 
-const HISTORY = 120;
 const MAX_CLIENTS = 200;
-const MAX_PER_IP = 4;
+// Generous, since a whole office or household can share one address
+const MAX_PER_IP = 10;
 
-// ---------------------------------------------------------------- host readers
+// ---------------------------------------------------------------- btop
 
-const read = (file) => fs.readFileSync(file, "utf8");
+// A headless copy of the screen, so a new viewer starts from the current picture
+// instead of waiting for btop to repaint everything.
+const screen = new Terminal({ cols: COLS, rows: ROWS, scrollback: 0, allowProposedApi: true });
+const serializer = new SerializeAddon();
+screen.loadAddon(serializer);
 
-function readCpu() {
-  return read("/proc/stat")
-    .split("\n")
-    .filter((line) => /^cpu\d* /.test(line))
-    .map((line) => {
-      const [user, nice, system, idle, iowait, irq, softirq, steal] = line.trim().split(/\s+/).slice(1).map(Number);
-      return { idle: idle + iowait, total: user + nice + system + idle + iowait + irq + softirq + steal };
-    });
+let btopUp = false;
+let pending = [];
+
+function connectBtop() {
+  const socket = net.connect(BTOP_SOCKET);
+  socket.on("connect", () => {
+    btopUp = true;
+    screen.reset();
+  });
+  socket.on("data", (chunk) => pending.push(chunk));
+  socket.on("error", () => {});
+  socket.on("close", () => {
+    btopUp = false;
+    setTimeout(connectBtop, 3000);
+  });
 }
 
-function readMem() {
-  const info = Object.fromEntries(
-    read("/proc/meminfo").split("\n").filter(Boolean).map((line) => {
-      const [key, value] = line.split(":");
-      return [key, parseInt(value, 10) * 1024];
-    }),
-  );
-  return { used: info.MemTotal - info.MemAvailable, total: info.MemTotal };
-}
+// btop's net box shows the interface's address, and has no setting to hide it. Any
+// IPv4 address is swapped for dots of the same width so the layout stays put. No \b:
+// the address follows straight on from an escape sequence's final "m".
+const DOT = Buffer.from("•").toString("latin1");
+const maskIps = (buffer) => Buffer.from(
+  buffer.toString("latin1").replace(/(?<![\d.])\d{1,3}(?:\.\d{1,3}){3}(?![\d.])/g, (ip) => ip.replace(/\d/g, DOT)),
+  "latin1",
+);
 
-// The CPU package sensor from coretemp, falling back to the hottest hwmon reading
-const tempFile = (() => {
-  const base = "/sys/class/hwmon";
-  try {
-    for (const hw of fs.readdirSync(base)) {
-      if (read(path.join(base, hw, "name")).trim() === "coretemp") return path.join(base, hw, "temp1_input");
-    }
-    for (const hw of fs.readdirSync(base)) {
-      const file = path.join(base, hw, "temp1_input");
-      if (fs.existsSync(file)) return file;
-    }
-  } catch (e) {}
-  return null;
-})();
-
-function readTemp() {
-  if (!tempFile) return null;
-  try { return parseInt(read(tempFile), 10) / 1000; } catch (e) { return null; }
-}
-
-function readNet() {
-  const line = read(NET_DEV).split("\n").find((l) => l.trim().startsWith(NET_IFACE + ":"));
-  if (!line) return null;
-  const fields = line.split(":")[1].trim().split(/\s+/).map(Number);
-  return { rx: fields[0], tx: fields[8] };
-}
-
-function readDisk() {
-  const s = fs.statfsSync("/");
-  return { used: (s.blocks - s.bfree) * s.bsize, total: s.blocks * s.bsize };
+// btop writes in many small pieces; batching them keeps it to ~20 frames a second
+function flushTerm() {
+  if (!pending.length) return;
+  const data = maskIps(Buffer.concat(pending));
+  pending = [];
+  screen.write(data);
+  broadcast("term", data.toString("base64"));
 }
 
 // ---------------------------------------------------------------- slow sources
@@ -173,56 +166,12 @@ async function readCommits() {
   return logs.flat().sort((a, b) => b.time - a.time).slice(0, 8);
 }
 
-// ---------------------------------------------------------------- sampler
+// ---------------------------------------------------------------- state
 
-const history = [];
-const info = { containers: [], traffic: null, disk: null, commits: [] };
-let latest = null;
-let prevCpu = readCpu();
-let prevNet = readNet();
-let prevAt = Date.now();
+const info = { containers: [], traffic: null, commits: [] };
 
-function sample() {
-  const now = Date.now();
-  const dt = (now - prevAt) / 1000;
-  const cpu = readCpu();
-  const net = readNet();
-
-  const pct = cpu.map((c, i) => {
-    const total = c.total - prevCpu[i].total;
-    return total > 0 ? Math.max(0, Math.min(100, (1 - (c.idle - prevCpu[i].idle) / total) * 100)) : 0;
-  });
-  const mem = readMem();
-  const [load1, load5, load15] = read("/proc/loadavg").split(" ").slice(0, 3).map(Number);
-
-  latest = {
-    t: now,
-    cpu: round(pct[0]),
-    cores: pct.slice(1).map(round),
-    mem,
-    temp: readTemp(),
-    net: net && prevNet && dt > 0
-      ? { rx: Math.max(0, (net.rx - prevNet.rx) / dt), tx: Math.max(0, (net.tx - prevNet.tx) / dt) }
-      : { rx: 0, tx: 0 },
-    load: [load1, load5, load15],
-    uptime: parseFloat(read("/proc/uptime")),
-    watching: clients.size,
-  };
-  prevCpu = cpu;
-  prevNet = net;
-  prevAt = now;
-
-  history.push({
-    t: now,
-    cpu: latest.cpu,
-    mem: round((mem.used / mem.total) * 100),
-    temp: latest.temp,
-    rx: Math.round(latest.net.rx),
-    tx: Math.round(latest.net.tx),
-  });
-  if (history.length > HISTORY) history.shift();
-
-  broadcast("tick", latest);
+function tick() {
+  return { uptime: parseFloat(fs.readFileSync("/proc/uptime", "utf8")), watching: clients.size, btop: btopUp };
 }
 
 async function refreshInfo() {
@@ -234,26 +183,23 @@ async function refreshInfo() {
   broadcast("info", info);
 }
 
-async function refreshSlow() {
-  try { info.disk = readDisk(); } catch (e) {}
+async function refreshCommits() {
   info.commits = await readCommits();
 }
-
-const round = (n) => Math.round(n * 10) / 10;
 
 // ---------------------------------------------------------------- streaming
 
 const clients = new Set();
 const perIp = new Map();
 
-function send(res, event, data) {
-  res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+function frame(event, data) {
+  return `event: ${event}\ndata: ${typeof data === "string" ? data : JSON.stringify(data)}\n\n`;
 }
 
 function broadcast(event, data) {
   if (!clients.size) return;
-  const frame = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
-  for (const res of clients) res.write(frame);
+  const text = frame(event, data);
+  for (const client of clients) client.write(text);
 }
 
 function stream(req, res) {
@@ -265,20 +211,46 @@ function stream(req, res) {
     return res.end("Too many viewers right now, try again shortly.\n");
   }
 
+  // btop's output is mostly repeated colour escapes and compresses around tenfold.
+  // Each frame is flushed through gzip straight away so the stream stays live.
+  const gzip = /\bgzip\b/.test(req.headers["accept-encoding"] || "");
   res.writeHead(200, {
     ...securityHeaders,
     "Content-Type": "text/event-stream",
     "Cache-Control": "no-cache, no-transform",
+    ...(gzip && { "Content-Encoding": "gzip" }),
     Connection: "keep-alive",
     "X-Accel-Buffering": "no",
   });
-  res.write("retry: 5000\n\n");
-  clients.add(res);
+  let out = res;
+  if (gzip) {
+    out = zlib.createGzip();
+    out.pipe(res);
+  }
+  const client = {
+    write(text) {
+      out.write(text);
+      if (gzip) out.flush(zlib.constants.Z_SYNC_FLUSH);
+    },
+    end: () => out.end(),
+  };
+  client.write("retry: 5000\n\n");
+
+  // Send what is batched to everyone else first: the snapshot already includes it
+  flushTerm();
+  clients.add(client);
   perIp.set(ip, (perIp.get(ip) || 0) + 1);
-  send(res, "init", { history, latest: latest && { ...latest, watching: clients.size }, info, historySize: HISTORY });
+  client.write(frame("init", {
+    cols: COLS,
+    rows: ROWS,
+    screen: Buffer.from(serializer.serialize()).toString("base64"),
+    tick: tick(),
+    info,
+  }));
 
   req.on("close", () => {
-    clients.delete(res);
+    clients.delete(client);
+    if (gzip) out.destroy();
     const left = (perIp.get(ip) || 1) - 1;
     if (left) perIp.set(ip, left); else perIp.delete(ip);
   });
@@ -289,7 +261,8 @@ function stream(req, res) {
 const securityHeaders = {
   "Content-Security-Policy": [
     "default-src 'self'",
-    "style-src 'self' https://fonts.googleapis.com",
+    // xterm.js injects <style> elements for its colours and layout
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "font-src https://fonts.gstatic.com",
     "img-src 'self' data:",
     "frame-ancestors 'none'",
@@ -298,18 +271,34 @@ const securityHeaders = {
   ].join("; "),
   "X-Content-Type-Options": "nosniff",
   "Referrer-Policy": "strict-origin-when-cross-origin",
-  "Permissions-Policy": "interest-cohort=()",
 };
 
 const types = { ".html": "text/html; charset=utf-8", ".css": "text/css; charset=utf-8", ".js": "text/javascript; charset=utf-8" };
 
 // Every public file is loaded once at start, so there is no path handling on requests
-const files = new Map(
-  fs.readdirSync(path.join(__dirname, "public")).map((name) => [
-    name === "index.html" ? "/" : `/${name}`,
-    { body: fs.readFileSync(path.join(__dirname, "public", name)), type: types[path.extname(name)] || "application/octet-stream" },
-  ]),
-);
+const files = new Map();
+function serve(route, file) {
+  files.set(route, { body: fs.readFileSync(file), type: types[path.extname(file)] || "application/octet-stream" });
+}
+for (const name of fs.readdirSync(path.join(__dirname, "public"))) {
+  serve(name === "index.html" ? "/" : `/${name}`, path.join(__dirname, "public", name));
+}
+serve("/vendor/xterm.js", require.resolve("@xterm/xterm/lib/xterm.js"));
+serve("/vendor/xterm.css", require.resolve("@xterm/xterm/css/xterm.css"));
+serve("/vendor/addon-webgl.js", require.resolve("@xterm/addon-webgl/lib/addon-webgl.js"));
+
+// Cloudflare overrides Cache-Control on static files to cache them for hours, so the
+// page links each asset with a hash of its content and a deploy is picked up at once
+{
+  const index = files.get("/");
+  let html = index.body.toString();
+  for (const [route, file] of files) {
+    if (route === "/") continue;
+    const hash = crypto.createHash("sha256").update(file.body).digest("hex").slice(0, 10);
+    html = html.replaceAll(`"${route.slice(1)}"`, `"${route.slice(1)}?v=${hash}"`);
+  }
+  index.body = Buffer.from(html);
+}
 
 const server = http.createServer((req, res) => {
   const url = new URL(req.url, "http://localhost");
@@ -323,10 +312,6 @@ const server = http.createServer((req, res) => {
     res.writeHead(200, { "Content-Type": "text/plain" });
     return res.end("ok\n");
   }
-  if (url.pathname === "/api/snapshot") {
-    res.writeHead(200, { ...securityHeaders, "Content-Type": "application/json", "Cache-Control": "no-cache" });
-    return res.end(JSON.stringify({ latest, info }));
-  }
 
   const file = files.get(url.pathname);
   if (!file) {
@@ -338,18 +323,20 @@ const server = http.createServer((req, res) => {
 });
 
 // A comment line now and then keeps idle proxies from dropping the stream
-const keepAlive = setInterval(() => { for (const res of clients) res.write(": ping\n\n"); }, 15_000);
+const keepAlive = setInterval(() => { for (const client of clients) client.write(": ping\n\n"); }, 15_000);
 
-setInterval(sample, 1000);
+connectBtop();
+setInterval(flushTerm, 50);
+setInterval(() => broadcast("tick", tick()), 1000);
 setInterval(refreshInfo, 5000);
-setInterval(refreshSlow, 60_000);
-refreshSlow().then(refreshInfo);
+setInterval(refreshCommits, 60_000);
+refreshCommits().then(refreshInfo);
 
 server.listen(PORT, () => console.log(`glassbox listening on :${PORT}`));
 
 function shutdown() {
   clearInterval(keepAlive);
-  for (const res of clients) res.end();
+  for (const client of clients) client.end();
   server.close(() => process.exit(0));
   setTimeout(() => process.exit(0), 2000).unref();
 }
