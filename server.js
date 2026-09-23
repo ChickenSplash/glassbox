@@ -149,7 +149,7 @@ function gitLog(repo) {
   return new Promise((resolve) => {
     execFile(
       "git",
-      ["-c", "safe.directory=*", "--git-dir", repo.dir, "log", "-n", "8", "--format=%H%x1f%ct%x1f%s"],
+      ["-c", "safe.directory=*", "--git-dir", repo.dir, "log", "--no-merges", "-n", "8", "--format=%H%x1f%ct%x1f%s"],
       { timeout: 5000 },
       (error, stdout) => {
         if (error) return resolve([]);
