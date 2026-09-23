@@ -15,6 +15,7 @@
   --radius: 14px;
   --max: 880px;
   --term-bg: #100400;
+  --term-pad: 14px;
   color-scheme: light;
 }
 
@@ -180,6 +181,10 @@ h1 { font-size: clamp(2.2rem, 6vw, 3.6rem); line-height: 1.08; font-weight: 700;
   border-top: 0;
 }
 .window {
+  /* Spans the stage until the terminal draws, then app.js sizes it to fit */
+  width: 100%;
+  max-width: 100%;
+  margin: 0 auto;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--term-bg);
@@ -197,11 +202,10 @@ h1 { font-size: clamp(2.2rem, 6vw, 3.6rem); line-height: 1.08; font-weight: 700;
 }
 .lights { display: flex; gap: 6px; }
 .lights i { width: 11px; height: 11px; border-radius: 50%; background: #3a1a10; }
-.title { flex: 1; text-align: center; }
-.badge { padding: 2px 8px; border: 1px solid rgba(255, 255, 255, .1); border-radius: 999px; }
-.term { padding: 10px 12px 12px; background: var(--term-bg); }
+.title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center; }
+.badge { flex-shrink: 0; white-space: nowrap; padding: 2px 8px; border: 1px solid rgba(255, 255, 255, .1); border-radius: 999px; }
+.term { overflow: hidden; padding: var(--term-pad); background: var(--term-bg); }
 .term .xterm-viewport { background: var(--term-bg) !important; overflow: hidden; }
-.term .xterm-screen { margin: 0 auto; }
 
 /* Containers and commits */
 .rows { list-style: none; margin: 0; padding: 0; }

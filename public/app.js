@@ -51,6 +51,8 @@ const decode = (base64) => Uint8Array.from(atob(base64), (c) => c.charCodeAt(0))
 
 const FONT = '"JetBrains Mono", ui-monospace, monospace';
 const box = $("term");
+const stage = document.querySelector(".stage");
+const frame = document.querySelector(".window");
 let term = null;
 
 // Pick the font size that makes btop's fixed number of columns fill the frame. Cells
@@ -58,8 +60,10 @@ let term = null;
 // what actually rendered, then step down until it fits.
 function fit() {
   if (!term) return;
-  const style = getComputedStyle(box);
-  const width = box.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+  // Measured from the stage, since the window is sized to the terminal
+  const pad = parseFloat(getComputedStyle(box).paddingLeft);
+  const border = frame.offsetWidth - frame.clientWidth;
+  const width = stage.clientWidth - border - pad * 2;
   const rendered = () => box.querySelector(".xterm-screen").getBoundingClientRect().width;
   const round = (n) => Math.floor(n * 10) / 10;
 
@@ -71,6 +75,17 @@ function fit() {
   while (rendered() > width && term.options.fontSize > 4) {
     term.options.fontSize = round(term.options.fontSize - 0.1);
   }
+
+  // Wrap the window tightly round what rendered, so the padding is even on every side.
+  // btop's outer border runs through the middle of the edge cells, and cells are
+  // taller than wide, so the top and bottom padding give back the difference.
+  const screen = box.querySelector(".xterm-screen").getBoundingClientRect();
+  const cellW = screen.width / term.cols;
+  const cellH = screen.height / term.rows;
+  const padY = Math.max(0, pad - (cellH - cellW) / 2);
+  box.style.padding = `${padY}px ${pad}px`;
+  box.style.height = `${screen.height + padY * 2}px`;
+  frame.style.width = `${screen.width + pad * 2 + border}px`;
 }
 
 async function createTerm(cols, rows) {
@@ -103,7 +118,7 @@ let resizeTimer;
 new ResizeObserver(() => {
   clearTimeout(resizeTimer);
   resizeTimer = setTimeout(fit, 100);
-}).observe(box);
+}).observe(stage);
 
 // ---------------------------------------------------------------- rendering
 
