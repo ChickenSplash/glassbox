@@ -19,6 +19,8 @@ services:
       REPOS: glassbox=ChickenSplash/glassbox,projects-panel=ChickenSplash/projects-panel
     volumes:
       - btop-socket:/run/btop
+      # The homelab's central palette, written by theme-apply
+      - /home/ecorreia/.config/homelab-theme:/theme:ro
       # Just the .git dirs, so no working tree (or .env) is visible
       - ./.git:/repos/glassbox:ro
       - ../projects-panel/.git:/repos/projects-panel:ro
@@ -43,8 +45,8 @@ services:
     tmpfs: [/tmp]
     volumes:
       - btop-socket:/run/btop
-      # The homelab's complemented theme, kept current by dms-btop-theme-homelab
-      # Inside btop's own config dir, the only place it looks for user themes
+      # Rendered from the central palette by theme-apply. Mounted inside btop's own
+      # config dir, the only place it looks for user themes
       - /home/ecorreia/.config/btop/themes:/etc/glassbox/btop/themes:ro
     restart: unless-stopped
 

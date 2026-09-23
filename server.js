@@ -17,6 +17,7 @@ const PORT = Number(process.env.PORT || 8080);
 const DOCKER = process.env.DOCKER_PROXY || "http://socket-proxy:2375";
 const NGINX_STATUS = process.env.NGINX_STATUS || "http://portfolio:8081/nginx_status";
 const BTOP_SOCKET = process.env.BTOP_SOCKET || "/run/btop/btop.sock";
+const THEME_DIR = process.env.THEME_DIR || "/theme";
 const COLS = Number(process.env.BTOP_COLS || 120);
 const ROWS = Number(process.env.BTOP_ROWS || 34);
 const REPO_DIR = process.env.REPO_DIR || "/repos";
@@ -42,10 +43,11 @@ const serializer = new SerializeAddon();
 screen.loadAddon(serializer);
 
 let btopUp = false;
+let btopSocket = null;
 let pending = [];
 
 function connectBtop() {
-  const socket = net.connect(BTOP_SOCKET);
+  const socket = (btopSocket = net.connect(BTOP_SOCKET));
   socket.on("connect", () => {
     btopUp = true;
     screen.reset();
@@ -54,7 +56,7 @@ function connectBtop() {
   socket.on("error", () => {});
   socket.on("close", () => {
     btopUp = false;
-    setTimeout(connectBtop, 3000);
+    setTimeout(connectBtop, socket.restarting ? 300 : 3000);
   });
 }
 
@@ -75,6 +77,63 @@ function flushTerm() {
   screen.write(data);
   broadcast("term", data.toString("base64"));
 }
+
+// ---------------------------------------------------------------- theme
+
+// The homelab's central palette (theme-apply writes palette.json), turned into the
+// page's CSS variables. The terminal stays in btop's own mode; the page follows the
+// visitor's light or dark preference.
+function paletteCss(p) {
+  const vars = (c, dark) => [
+    `--bg: ${c.background}`,
+    `--surface: ${dark ? c.surface_container : `color-mix(in srgb, ${c.background} 40%, #fff)`}`,
+    `--text: color-mix(in srgb, ${c.on_background} ${dark ? 55 : 45}%, ${dark ? "#fff" : "#000"})`,
+    `--muted: ${dark ? `color-mix(in srgb, ${c.on_background} 80%, ${c.background})` : c.on_background}`,
+    `--border: color-mix(in srgb, ${c.outline} 35%, ${c.background})`,
+    `--accent: ${c.primary}`,
+    `--accent-text: ${c.on_primary}`,
+    `--glow: color-mix(in srgb, ${c.primary} ${dark ? 18 : 12}%, transparent)`,
+  ].join("; ");
+  const t = p.colors[p.mode || "dark"];
+  const term = `--term-bg: ${t.background}; --term-fg: ${t.on_background}; --term-dim: ${t.surface_container_highest}`;
+  const dark = vars(p.colors.dark, true);
+  return [
+    `:root { ${vars(p.colors.light, false)}; ${term}; color-scheme: light }`,
+    `@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { ${dark}; color-scheme: dark } }`,
+    `:root[data-theme="dark"] { ${dark}; color-scheme: dark }`,
+  ].join("\n");
+}
+
+let themeCss = "";
+function loadTheme() {
+  try {
+    const css = paletteCss(JSON.parse(fs.readFileSync(path.join(THEME_DIR, "palette.json"), "utf8")));
+    if (css === themeCss) return false;
+    themeCss = css;
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+loadTheme();
+
+// theme-apply swaps palette.json in with a rename, so watch the directory. By then the
+// btop theme is already rewritten, so btop is restarted to pick it up.
+let themeTimer;
+try {
+  fs.watch(THEME_DIR, (event, name) => {
+    if (name !== "palette.json") return;
+    clearTimeout(themeTimer);
+    themeTimer = setTimeout(() => {
+      if (!loadTheme()) return;
+      broadcast("theme", { css: themeCss });
+      if (btopSocket) {
+        btopSocket.restarting = true;
+        btopSocket.destroy();
+      }
+    }, 300);
+  });
+} catch (e) {}
 
 // ---------------------------------------------------------------- slow sources
 
@@ -244,6 +303,7 @@ function stream(req, res) {
     cols: COLS,
     rows: ROWS,
     screen: Buffer.from(serializer.serialize()).toString("base64"),
+    theme: themeCss,
     tick: tick(),
     info,
   }));
@@ -318,8 +378,11 @@ const server = http.createServer((req, res) => {
     res.writeHead(404, { "Content-Type": "text/plain" });
     return res.end("Not found\n");
   }
+  const body = url.pathname === "/"
+    ? Buffer.from(file.body.toString().replace("<!--palette-->", `<style id="palette">${themeCss}</style>`))
+    : file.body;
   res.writeHead(200, { ...securityHeaders, "Content-Type": file.type, "Cache-Control": "no-cache" });
-  res.end(req.method === "HEAD" ? undefined : file.body);
+  res.end(req.method === "HEAD" ? undefined : body);
 });
 
 // A comment line now and then keeps idle proxies from dropping the stream

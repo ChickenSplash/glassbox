@@ -1,4 +1,4 @@
-/* Same palette, type and light/dark handling as the portfolio */
+/* Fallback palette. The server injects the homelab's central one (theme-apply) over it */
 :root {
   --bg: #fafaf9;
   --surface: #ffffff;
@@ -15,6 +15,8 @@
   --radius: 14px;
   --max: 880px;
   --term-bg: #100400;
+  --term-fg: #ac9f9e;
+  --term-dim: #2a0a00;
   --term-pad: 14px;
   color-scheme: light;
 }
@@ -198,10 +200,10 @@ h1 { font-size: clamp(2.2rem, 6vw, 3.6rem); line-height: 1.08; font-weight: 700;
   padding: 10px 14px;
   border-bottom: 1px solid rgba(255, 255, 255, .06);
   font: 400 12px "JetBrains Mono", monospace;
-  color: #ac9f9e;
+  color: var(--term-fg);
 }
 .lights { display: flex; gap: 6px; }
-.lights i { width: 11px; height: 11px; border-radius: 50%; background: #3a1a10; }
+.lights i { width: 11px; height: 11px; border-radius: 50%; background: var(--term-dim); }
 .title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center; }
 .badge { flex-shrink: 0; white-space: nowrap; padding: 2px 8px; border: 1px solid rgba(255, 255, 255, .1); border-radius: 999px; }
 .term { overflow: hidden; padding: var(--term-pad); background: var(--term-bg); }

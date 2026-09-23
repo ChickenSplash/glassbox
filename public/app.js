@@ -120,6 +120,20 @@ new ResizeObserver(() => {
   resizeTimer = setTimeout(fit, 100);
 }).observe(stage);
 
+// The server sends the homelab's palette as CSS; swapping it in recolours the page
+function applyTheme(css) {
+  if (!css) return;
+  let style = $("palette");
+  if (!style) {
+    style = el("style");
+    style.id = "palette";
+    document.head.append(style);
+  }
+  if (style.textContent === css) return;
+  style.textContent = css;
+  if (term) term.options.theme = { background: getComputedStyle(root).getPropertyValue("--term-bg").trim() };
+}
+
 // ---------------------------------------------------------------- rendering
 
 function renderTick(t) {
@@ -173,6 +187,7 @@ function connect() {
 
   source.addEventListener("init", (event) => {
     const data = JSON.parse(event.data);
+    applyTheme(data.theme);
     renderTick(data.tick);
     renderInfo(data.info);
     setStatus("live", "Live · streaming from the homelab");
@@ -192,6 +207,7 @@ function connect() {
     term.write(decode(event.data));
   });
 
+  source.addEventListener("theme", (event) => applyTheme(JSON.parse(event.data).css));
   source.addEventListener("tick", (event) => renderTick(JSON.parse(event.data)));
   source.addEventListener("info", (event) => renderInfo(JSON.parse(event.data)));
 
