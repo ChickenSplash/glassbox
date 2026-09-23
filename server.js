@@ -275,7 +275,7 @@ function stream(req, res) {
   res.write("retry: 5000\n\n");
   clients.add(res);
   perIp.set(ip, (perIp.get(ip) || 0) + 1);
-  send(res, "init", { history, latest, info, historySize: HISTORY });
+  send(res, "init", { history, latest: latest && { ...latest, watching: clients.size }, info, historySize: HISTORY });
 
   req.on("close", () => {
     clients.delete(res);
