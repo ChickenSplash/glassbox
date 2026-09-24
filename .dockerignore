@@ -3,3 +3,5 @@ node_modules
 btop
 README.md
 docker-compose.yml
+models
+ask

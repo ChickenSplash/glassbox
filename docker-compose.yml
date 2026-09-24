@@ -19,13 +19,15 @@ services:
       REPOS: glassbox=ChickenSplash/glassbox,projects-panel=ChickenSplash/projects-panel
     volumes:
       - btop-socket:/run/btop
+      # Read on every question, so edits apply without a rebuild
+      - ./ask:/app/ask:ro
       # The homelab's central palette, written by theme-apply
       - /home/ecorreia/.config/homelab-theme:/theme:ro
       # Just the .git dirs, so no working tree (or .env) is visible
       - ./.git:/repos/glassbox:ro
       - ../projects-panel/.git:/repos/projects-panel:ro
-    networks: [edge, docker-proxy]
-    depends_on: [socket-proxy, btop]
+    networks: [edge, docker-proxy, llm]
+    depends_on: [socket-proxy, btop, llm]
     restart: unless-stopped
 
   # btop on a pty, served over a unix socket that only the app container mounts.
@@ -48,6 +50,31 @@ services:
       # Rendered from the central palette by theme-apply. Mounted inside btop's own
       # config dir, the only place it looks for user themes
       - /home/ecorreia/.config/btop/themes:/etc/glassbox/btop/themes:ro
+    restart: unless-stopped
+
+  # "Ask the homelab": Qwen3.5-4B on the CPU. One answer at a time (the app queues
+  # the rest), 5 of the 6 cores (6 is no faster) so the sites it hosts stay responsive.
+  llm:
+    image: ghcr.io/ggml-org/llama.cpp:server
+    container_name: glassbox-llm
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges]
+    mem_limit: 4g
+    # Flag and value as separate items: llama.cpp turns _ into - in --flag=value.
+    # Checkpoints at any spacing, so the shared system prompt stays cached between
+    # visitors (the default only saves one every 8192 tokens)
+    command: [
+      --model, /models/Qwen3.5-4B-Q4_K_M.gguf,
+      --host, 0.0.0.0, --port, "8080",
+      --ctx-size, "8192", --parallel, "1", --threads, "5",
+      --checkpoint-min-step, "0",
+      --jinja, --no-webui,
+    ]
+    volumes:
+      # Downloaded separately, see the README. Not in git.
+      - ./models:/models:ro
+    networks: [llm]
     restart: unless-stopped
 
   # Filters the Docker socket down to listing containers and reading their stats
@@ -82,4 +109,7 @@ networks:
     external: true
   # No route out and nothing else on it: only glassbox can reach the proxy
   docker-proxy:
+    internal: true
+  # Same again for the model: only glassbox reaches it, and it has no way out
+  llm:
     internal: true

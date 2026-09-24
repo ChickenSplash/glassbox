@@ -168,6 +168,88 @@ function renderInfo(info) {
   }
 }
 
+// ---------------------------------------------------------------- ask
+
+const askLog = $("ask-log");
+const askForm = $("ask-form");
+const askInput = $("ask-input");
+const askButton = askForm.querySelector("button");
+// The last few turns go back with each question, so follow-ups make sense
+const history = [];
+let asking = false;
+
+// Only follow the answer down if the reader has not scrolled up to read something
+function withScroll(update) {
+  const atBottom = askLog.scrollHeight - askLog.scrollTop - askLog.clientHeight < 40;
+  update();
+  if (atBottom) askLog.scrollTop = askLog.scrollHeight;
+}
+
+askForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const question = askInput.value.trim();
+  if (!question || asking) return;
+  asking = true;
+  askButton.disabled = true;
+  askInput.value = "";
+
+  const answer = el("p", "ask-a waiting", "Sending...");
+  withScroll(() => {
+    askLog.querySelector(".ask-hint")?.remove();
+    askLog.append(el("p", "ask-q", question), answer);
+  });
+  history.push({ role: "user", content: question });
+
+  let text = "";
+  const show = (update) => withScroll(update);
+  try {
+    const response = await fetch("/ask", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ messages: history.slice(-5) }),
+    });
+    if (!response.ok) {
+      const { error } = await response.json().catch(() => ({}));
+      throw new Error(error || "Something went wrong. Try again shortly.");
+    }
+
+    // One JSON object per line: a queue position, then the answer in pieces
+    const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
+    let buffer = "";
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += value;
+      const lines = buffer.split("\n");
+      buffer = lines.pop();
+      for (const line of lines.filter(Boolean)) {
+        const data = JSON.parse(line);
+        if (data.error) throw new Error(data.error);
+        if (data.queue) show(() => { answer.textContent = `Waiting in line · ${data.queue} ahead of you`; });
+        else if (data.queue === 0) show(() => { answer.textContent = "Thinking..."; });
+        if (data.t) {
+          text += data.t;
+          show(() => {
+            answer.className = "ask-a streaming";
+            answer.textContent = text.trimStart();
+          });
+        }
+      }
+    }
+    if (!text) throw new Error("No answer came back. Try again shortly.");
+    history.push({ role: "assistant", content: text.trim() });
+  } catch (error) {
+    history.pop();
+    show(() => {
+      answer.className = "ask-a error";
+      answer.textContent = text ? `${text.trim()}\n\n${error.message}` : error.message;
+    });
+  }
+  answer.classList.remove("streaming", "waiting");
+  asking = false;
+  askButton.disabled = false;
+});
+
 // ---------------------------------------------------------------- stream
 
 const status = document.querySelector(".status");
