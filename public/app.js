@@ -44,16 +44,14 @@ const FONT = '"JetBrains Mono", ui-monospace, monospace';
 const box = $("term");
 let term = null;
 
-// Pick the font size that makes btop's fixed number of columns fill the frame. Cells
-// snap to whole device pixels, so width is not proportional to font size: scale from
-// what actually rendered, then step down until it fits.
+// Fit the fixed 120-column terminal with the same padding as the chat window.
+// xterm's cells snap to device pixels, so render just larger than the frame and
+// shrink slightly; enlarging small rasterised glyphs made the old view blurry.
 function fit() {
   if (!term) return;
-  // The window always spans the page column, so its edges line up with the content
   const pad = parseFloat(getComputedStyle(root).getPropertyValue("--term-pad"));
   const width = box.clientWidth - pad * 2;
   const screen = box.querySelector(".xterm-screen");
-  // offsetWidth ignores the scale applied below, so this is the size xterm drew at
   const rendered = () => screen.offsetWidth;
   const round = (n) => Math.floor(n * 10) / 10;
 
@@ -62,22 +60,28 @@ function fit() {
     if (!Number.isFinite(size) || size === term.options.fontSize) break;
     term.options.fontSize = size;
   }
-  while (rendered() > width && term.options.fontSize > 4) {
-    term.options.fontSize = round(term.options.fontSize - 0.1);
+  // Pick the *smallest* font that renders at least this wide. Several font sizes
+  // share a cell width (at 390px, 5px -> 360px but 7px -> 480px). A binary search
+  // avoids a slow sequence of xterm redraws and never chooses the larger jump.
+  let low = 40;
+  let high = Math.max(low, Math.ceil(term.options.fontSize * 10));
+  term.options.fontSize = high / 10;
+  if (rendered() < width) {
+    high = 320;
+    term.options.fontSize = high / 10;
   }
-
-  // With 120 columns, whole-pixel cells leave up to 120px spare. Scale the last bit
-  // so btop fills the window exactly. btop's outer border runs through the middle of
-  // the edge cells, and cells are taller than wide, so the top and bottom padding give
-  // back the difference and the gap looks even all round.
+  while (low < high) {
+    const mid = Math.floor((low + high) / 2);
+    term.options.fontSize = mid / 10;
+    if (rendered() < width) low = mid + 1;
+    else high = mid;
+  }
+  term.options.fontSize = high / 10;
   const scale = width / rendered();
-  const w = rendered() * scale;
-  const h = screen.offsetHeight * scale;
-  const padY = Math.max(0, pad - (h / term.rows - w / term.cols) / 2);
   screen.style.transformOrigin = "0 0";
-  screen.style.transform = `scale(${scale})`;
-  box.style.padding = `${padY}px ${pad}px`;
-  box.style.height = `${h + padY * 2}px`;
+  screen.style.transform = scale === 1 ? "none" : `scale(${scale})`;
+  box.style.padding = `${pad}px`;
+  box.style.height = `${screen.offsetHeight * scale + pad * 2}px`;
 }
 
 async function createTerm(cols, rows) {
