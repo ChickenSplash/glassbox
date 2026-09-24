@@ -23,6 +23,9 @@ services:
       - ./ask:/app/ask:ro
       # The homelab's central palette, written by theme-apply
       - /home/ecorreia/.config/homelab-theme:/theme:ro
+      # Where the chat writes a visitor's theme pick (a preset name) for theme-apply.
+      # Only this directory is writable, and nothing else in the container is
+      - /home/ecorreia/.config/homelab-theme/choice:/theme-choice
       # Just the .git dirs, so no working tree (or .env) is visible
       - ./.git:/repos/glassbox:ro
       - ../projects-panel/.git:/repos/projects-panel:ro

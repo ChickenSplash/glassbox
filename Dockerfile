@@ -10,6 +10,7 @@ COPY package.json package-lock.json ./
 RUN npm ci --omit=dev --no-fund --no-audit
 COPY server.js ./
 COPY public ./public
+COPY themes ./themes
 
 USER node
 EXPOSE 8080

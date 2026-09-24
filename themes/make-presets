@@ -1,0 +1,46 @@
+#!/usr/bin/env python3
+"""Generate the theme presets visitors can pick from the chat.
+
+Each seed colour in seeds.json becomes <name>.json here, in the same shape as the
+homelab's ~/.config/homelab-theme/palette.json: a Material You scheme from matugen
+plus DankMaterialShell's dank16 terminal colours. Needs matugen and dms, so run it
+on the PC after editing seeds.json, then commit the results. The homelab only
+copies these files, it does not generate anything.
+"""
+import json
+import pathlib
+import subprocess
+
+HERE = pathlib.Path(__file__).resolve().parent
+SCHEME = "scheme-vibrant"
+
+
+def run(*args):
+    return json.loads(subprocess.run(args, check=True, capture_output=True, text=True).stdout)
+
+
+def preset(seed):
+    scheme = run("matugen", "color", "hex", seed, "--dry-run", "-j", "hex", "-t", SCHEME)["colors"]
+    colors = {mode: {k: v[mode]["color"] for k, v in scheme.items()} for mode in ("dark", "light")}
+    dank16 = run(
+        "dms", "dank16", colors["dark"]["primary"], "--variants", "--json",
+        "--primary-dark", colors["dark"]["primary"],
+        "--primary-light", colors["light"]["primary"],
+        "--background", colors["dark"]["background"],
+    )
+    dank16 = {k: {mode: v[mode]["hex"] for mode in ("dark", "light", "default")} for k, v in dank16.items()}
+    return {"seed": seed, "mode": "dark", "colors": colors, "dank16": dank16}
+
+
+def main():
+    seeds = json.loads((HERE / "seeds.json").read_text())
+    for old in HERE.glob("*.json"):
+        if old.name != "seeds.json" and old.stem not in seeds:
+            old.unlink()
+    for name, seed in seeds.items():
+        (HERE / f"{name}.json").write_text(json.dumps(preset(seed), indent=2) + "\n")
+        print(f"{name} {seed}")
+
+
+if __name__ == "__main__":
+    main()

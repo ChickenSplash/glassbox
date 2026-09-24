@@ -24,6 +24,13 @@ small model on the same CPU.
   Its tone and conversational rules are in [`ask/prompt.md`](ask/prompt.md). Both files
   are read on every question, so edits to either apply without a rebuild; the app
   re-warms the model's prompt cache when they change.
+- **Themes:** visitors can ask the chat for a new colour. The model calls a `set_theme`
+  tool limited to the presets in [`themes/`](themes), each generated from a seed colour
+  in `themes/seeds.json` by `themes/make-presets` (matugen plus DankMaterialShell's
+  dank16, so it runs on a desktop; commit the output). The app only writes the chosen
+  name to a mounted `choice/` directory, and the homelab's own `theme-apply` recolours
+  btop, the page and the rest of the machine from it. One change a minute overall,
+  and one per visitor every 10 minutes.
 
 ## Run
 

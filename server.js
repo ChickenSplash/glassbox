@@ -18,6 +18,9 @@ const PORT = Number(process.env.PORT || 8080);
 const DOCKER = process.env.DOCKER_PROXY || "http://socket-proxy:2375";
 const BTOP_SOCKET = process.env.BTOP_SOCKET || "/run/btop/btop.sock";
 const THEME_DIR = process.env.THEME_DIR || "/theme";
+// The one file the app may write on the host: a preset name, which theme-apply there
+// validates and applies
+const THEME_CHOICE = process.env.THEME_CHOICE || "/theme-choice/theme";
 const LLM = process.env.LLM || "http://llm:8080";
 const FACTS = process.env.FACTS || path.join(__dirname, "ask/facts.md");
 const PROMPT = process.env.PROMPT || path.join(__dirname, "ask/prompt.md");
@@ -253,6 +256,61 @@ const ASK_WINDOW = 10 * 60_000;
 const ASK_TURNS = 3;
 const ASK_MAX_TOKENS = 200;
 
+// Visitors can recolour the homelab from the chat, but only to a preset generated
+// from a seed colour (themes/, see make-presets), and not so often that one person
+// can keep it for themselves
+const THEMES = fs.readdirSync(path.join(__dirname, "themes"))
+  .filter((name) => name.endsWith(".json") && name !== "seeds.json")
+  .map((name) => name.slice(0, -5))
+  .sort();
+const THEME_COOLDOWN = 60_000;
+const THEME_PER_IP = 10 * 60_000;
+const themeLog = new Map();
+let lastThemeChange = 0;
+
+const TOOLS = [{
+  type: "function",
+  function: {
+    name: "set_theme",
+    description: "Change the colour theme of the whole homelab: this page, its btop and its terminal. Only when a visitor asks to change the theme or colours; pick the closest colour.",
+    parameters: {
+      type: "object",
+      properties: { colour: { type: "string", enum: THEMES } },
+      required: ["colour"],
+    },
+  },
+}];
+
+function currentTheme() {
+  try {
+    return fs.readFileSync(THEME_CHOICE, "utf8").trim();
+  } catch (e) {
+    return "";
+  }
+}
+
+// Returns what happened, for the model to pass on
+function setTheme(colour, ip) {
+  if (!THEMES.includes(colour)) return { ok: false, result: `There is no ${colour} theme. The choices are: ${THEMES.join(", ")}.` };
+  if (colour === currentTheme()) return { ok: false, result: `Nothing to do: the theme is already ${colour}.` };
+  const now = Date.now();
+  const still = `Not changed, the theme is still ${currentTheme() || "the same"}.`;
+  const mine = (themeLog.get(ip) ?? -Infinity) + THEME_PER_IP - now;
+  if (mine > 0) return { ok: false, result: `${still} This visitor changed it recently, and each visitor can only change it once every 10 minutes. They can ask again in ${Math.ceil(mine / 60_000)} minutes.` };
+  const anyone = lastThemeChange + THEME_COOLDOWN - now;
+  if (anyone > 0) return { ok: false, result: `${still} Another visitor changed it under a minute ago, so it is locked for ${Math.ceil(anyone / 1000)} more seconds.` };
+
+  const tmp = path.join(path.dirname(THEME_CHOICE), ".theme.tmp");
+  fs.writeFileSync(tmp, `${colour}\n`);
+  fs.renameSync(tmp, THEME_CHOICE);
+  lastThemeChange = now;
+  themeLog.set(ip, now);
+  return { ok: true, result: `Done: the theme is now ${colour}. The page recolours itself in a second or two.` };
+}
+setInterval(() => {
+  for (const [ip, t] of themeLog) if (Date.now() - t > THEME_PER_IP) themeLog.delete(ip);
+}, THEME_PER_IP);
+
 // Prompt and facts are both mounted read-only and reloaded on each request, so the
 // personality can be adjusted without rebuilding the app.
 function systemPrompt() {
@@ -292,6 +350,9 @@ function liveContext(messages) {
   }
   if (/\b(commits?|latest change|recent change)\b/i.test(question) && info.commits[0]) {
     parts.push(`Latest commit: "${info.commits[0].subject}" in ${info.commits[0].repo}`);
+  }
+  if (/\b(themes?|colou?rs?)\b/i.test(question) && currentTheme()) {
+    parts.push(`Current theme: ${currentTheme()}`);
   }
   return parts.length ? `\n\n(Current server data, use only if relevant: ${parts.join("; ")})` : "";
 }
@@ -396,7 +457,7 @@ async function ask(req, res) {
       if (finished) return;
       send({ queue: 0 });
       try {
-        await streamAnswer(messages, send, abort.signal);
+        await streamAnswer(messages, send, abort.signal, ip);
         send({ done: true });
       } catch (e) {
         if (!abort.signal.aborted) send({ error: "The model isn't answering right now. Try again shortly." });
@@ -428,11 +489,15 @@ function complete(messages, options) {
       top_p: 0.9,
       cache_prompt: true,
       chat_template_kwargs: { enable_thinking: false },
+      // Always sent, even when a tool call is not wanted: the template puts the tools
+      // in the system prompt, which has to stay identical to stay cached
+      tools: TOOLS,
       ...options.body,
       messages: [
         { role: "system", content: systemPrompt() },
         ...messages.slice(0, -1),
         { role: "user", content: `${messages.at(-1).content}${liveContext(messages)}` },
+        ...(options.after || []),
       ],
     }),
   });
@@ -463,26 +528,54 @@ try {
   });
 } catch (e) {}
 
-async function streamAnswer(messages, send, signal) {
-  const response = await complete(messages, {
-    signal: AbortSignal.any([signal, AbortSignal.timeout(120_000)]),
-    body: { stream: true },
-  });
+// Text is passed on as it arrives. If the model asks to change the theme instead,
+// that is done here and the model is asked again, with the outcome, for its reply.
+async function streamAnswer(messages, send, signal, ip) {
+  signal = AbortSignal.any([signal, AbortSignal.timeout(120_000)]);
+  const call = await streamReply(messages, send, signal);
+  if (!call) return;
+
+  let colour;
+  try {
+    colour = String(JSON.parse(call.arguments).colour).toLowerCase();
+  } catch (e) {}
+  const { ok, result } = call.name === "set_theme" && colour
+    ? setTheme(colour, ip)
+    : { ok: false, result: "That tool does not exist." };
+  send({ tool: { name: "Theme", arg: colour || "?", ok } });
+
+  await streamReply(messages, send, signal, [
+    { role: "assistant", content: "", tool_calls: [{ id: "call_0", type: "function", function: call }] },
+    { role: "tool", tool_call_id: "call_0", content: result },
+  ]);
+}
+
+// OpenAI-style SSE from llama.cpp. Returns the tool call, if the model made one
+// (only the first, and never after a tool result has been given).
+async function streamReply(messages, send, signal, after) {
+  const response = await complete(messages, { signal, after, body: { stream: true } });
   if (!response.ok) throw new Error(`llm: ${response.status}`);
 
-  // OpenAI-style SSE from llama.cpp, passed on as plain text pieces
   const decoder = new TextDecoder();
   let buffer = "";
+  let call = null;
   for await (const chunk of response.body) {
     buffer += decoder.decode(chunk, { stream: true });
     const lines = buffer.split("\n");
     buffer = lines.pop();
     for (const line of lines) {
       if (!line.startsWith("data: ") || line === "data: [DONE]") continue;
-      const text = JSON.parse(line.slice(6)).choices?.[0]?.delta?.content;
-      if (text) send({ t: text });
+      const delta = JSON.parse(line.slice(6)).choices?.[0]?.delta;
+      if (delta?.content) send({ t: delta.content });
+      for (const piece of delta?.tool_calls || []) {
+        if (piece.index) continue;
+        call ??= { name: "", arguments: "" };
+        call.name += piece.function?.name || "";
+        call.arguments += piece.function?.arguments || "";
+      }
     }
   }
+  return after ? null : call;
 }
 
 // ---------------------------------------------------------------- streaming
