@@ -142,8 +142,13 @@ function renderTick(t) {
   $("watching").textContent = t.watching === 1 ? "1 (just you)" : t.watching;
 }
 
+let model = null;
+
 function renderInfo(info) {
-  if (info.model) $("ask-model")?.replaceChildren(info.model);
+  if (info.model) {
+    model = info.model;
+    $("ask-model")?.replaceChildren(model);
+  }
   if (info.requests) {
     $("requests").textContent = info.requests.total.toLocaleString("en-GB");
     $("rpm").textContent = `${info.requests.perMinute} req`;
@@ -203,6 +208,12 @@ function statusLine() {
   return { line, spin, text };
 }
 
+const helpText = () => `You are chatting with ${model || "a small local model"}, ask it something, and watch the CPU spike below.
+
+You can:
+- Ask anything
+- Change the homelab's theme`;
+
 // Only follow the answer down if the reader has not scrolled up to read something
 function withScroll(update) {
   const atBottom = askLog.scrollHeight - askLog.scrollTop - askLog.clientHeight < 40;
@@ -214,8 +225,17 @@ askForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   const question = askInput.value.trim();
   if (!question || asking) return;
-  asking = true;
   askInput.value = "";
+
+  // Answered here, without troubling the model
+  if (question.toLowerCase() === "/help") {
+    withScroll(() => {
+      askLog.querySelector(".ask-hint")?.remove();
+      askLog.append(el("p", "ask-q", question), el("p", "ask-a", helpText()));
+    });
+    return;
+  }
+  asking = true;
 
   const [verb, done] = VERBS[Math.floor(Math.random() * VERBS.length)];
   const started = Date.now();
