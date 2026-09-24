@@ -257,16 +257,11 @@ const ASK_TURNS = 3;
 const ASK_MAX_TOKENS = 200;
 
 // Visitors can recolour the homelab from the chat, but only to a preset generated
-// from a seed colour (themes/, see make-presets), and not so often that one person
-// can keep it for themselves
+// from a seed colour (themes/, see make-presets)
 const THEMES = fs.readdirSync(path.join(__dirname, "themes"))
   .filter((name) => name.endsWith(".json") && name !== "seeds.json")
   .map((name) => name.slice(0, -5))
   .sort();
-const THEME_COOLDOWN = 60_000;
-const THEME_PER_IP = 10 * 60_000;
-const themeLog = new Map();
-let lastThemeChange = 0;
 
 const TOOLS = [{
   type: "function",
@@ -290,35 +285,17 @@ function currentTheme() {
 }
 
 // Returns what happened: `result` for the model to pass on, `note` for the page
-function setTheme(colour, ip) {
+function setTheme(colour) {
   const fail = (note, result) => ({ ok: false, note: `Couldn't change the theme to ${colour}: ${note}`, result });
   if (!THEMES.includes(colour)) return fail("no such theme", `There is no ${colour} theme. The choices are: ${THEMES.join(", ")}.`);
   const current = currentTheme();
   if (colour === current) return fail("it already is", `Nothing to do: the theme is already ${colour}.`);
-  const now = Date.now();
-  const mine = (themeLog.get(ip) ?? -Infinity) + THEME_PER_IP - now;
-  if (mine > 0) {
-    const minutes = Math.ceil(mine / 60_000);
-    return fail(`you can change it again in ${minutes} min`,
-      `Not changed, it is still ${current}. You (the visitor you are talking to) changed the theme yourself less than 10 minutes ago, and each visitor gets one change every 10 minutes. You can change it again in ${minutes} minutes.`);
-  }
-  const anyone = lastThemeChange + THEME_COOLDOWN - now;
-  if (anyone > 0) {
-    const seconds = Math.ceil(anyone / 1000);
-    return fail(`locked for ${seconds}s after another change`,
-      `Not changed, it is still ${current}. A different visitor changed it under a minute ago, so it is locked for ${seconds} more seconds.`);
-  }
 
   const tmp = path.join(path.dirname(THEME_CHOICE), ".theme.tmp");
   fs.writeFileSync(tmp, `${colour}\n`);
   fs.renameSync(tmp, THEME_CHOICE);
-  lastThemeChange = now;
-  themeLog.set(ip, now);
   return { ok: true, note: `Changed the theme to ${colour}`, result: `Done: the theme is now ${colour}. The page recolours itself in a second or two.` };
 }
-setInterval(() => {
-  for (const [ip, t] of themeLog) if (Date.now() - t > THEME_PER_IP) themeLog.delete(ip);
-}, THEME_PER_IP);
 
 // Prompt and facts are both mounted read-only and reloaded on each request, so the
 // personality can be adjusted without rebuilding the app.
@@ -466,7 +443,7 @@ async function ask(req, res) {
       if (finished) return;
       send({ queue: 0 });
       try {
-        await streamAnswer(messages, send, abort.signal, ip);
+        await streamAnswer(messages, send, abort.signal);
         send({ done: true });
       } catch (e) {
         if (!abort.signal.aborted) send({ error: "The model isn't answering right now. Try again shortly." });
@@ -539,7 +516,7 @@ try {
 
 // Text is passed on as it arrives. If the model asks to change the theme instead,
 // that is done here and the model is asked again, with the outcome, for its reply.
-async function streamAnswer(messages, send, signal, ip) {
+async function streamAnswer(messages, send, signal) {
   signal = AbortSignal.any([signal, AbortSignal.timeout(120_000)]);
   const call = await streamReply(messages, send, signal);
   if (!call) return;
@@ -549,7 +526,7 @@ async function streamAnswer(messages, send, signal, ip) {
     colour = String(JSON.parse(call.arguments).colour).toLowerCase();
   } catch (e) {}
   const { ok, note, result } = call.name === "set_theme" && colour
-    ? setTheme(colour, ip)
+    ? setTheme(colour)
     : { ok: false, note: "Couldn't change the theme", result: "That tool does not exist." };
   send({ tool: { ok, note } });
 

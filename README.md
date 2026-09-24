@@ -29,8 +29,8 @@ small model on the same CPU.
   in `themes/seeds.json` by `themes/make-presets` (matugen plus DankMaterialShell's
   dank16, so it runs on a desktop; commit the output). The app only writes the chosen
   name to a mounted `choice/` directory, and the homelab's own `theme-apply` recolours
-  btop, the page and the rest of the machine from it. One change a minute overall,
-  and one per visitor every 10 minutes.
+  btop, the page and the rest of the machine from it. There is no cooldown; the usual
+  chat rate limit is the only cap.
 
 ## Run
 
