@@ -1,7 +1,7 @@
 "use strict";
 
 // Glass box: mirrors one btop screen from the homelab to every open page over
-// Server-Sent Events, alongside its containers, portfolio traffic and recent commits,
+// Server-Sent Events, alongside its containers, own traffic and recent commits,
 // and answers questions with a small model running on the same CPU.
 
 const http = require("node:http");
@@ -16,7 +16,6 @@ const { SerializeAddon } = require("@xterm/addon-serialize");
 
 const PORT = Number(process.env.PORT || 8080);
 const DOCKER = process.env.DOCKER_PROXY || "http://socket-proxy:2375";
-const NGINX_STATUS = process.env.NGINX_STATUS || "http://portfolio:8081/nginx_status";
 const BTOP_SOCKET = process.env.BTOP_SOCKET || "/run/btop/btop.sock";
 const THEME_DIR = process.env.THEME_DIR || "/theme";
 const LLM = process.env.LLM || "http://llm:8080";
@@ -177,29 +176,25 @@ async function readContainers() {
   return containers.sort((a, b) => a.name.localeCompare(b.name));
 }
 
-// stub_status counts its own requests too, so each of our polls is taken off the total
-const traffic = { requests: null, active: null, perMinute: 0, lastRaw: null, window: [] };
+// Count requests reaching this app, rather than another site's nginx. Static files
+// served from Cloudflare's cache never reach us; /healthz and HEAD probes are excluded.
+// One bucket per second keeps memory bounded even if someone makes many requests.
+let totalRequests = 0;
+const requestSeconds = new Map();
 
-async function readTraffic() {
-  const response = await fetch(NGINX_STATUS, { signal: AbortSignal.timeout(3000) });
-  const text = await response.text();
-  const active = Number(text.match(/Active connections:\s*(\d+)/)[1]);
-  const raw = Number(text.match(/\n\s*\d+\s+\d+\s+(\d+)/)[1]);
-  const now = Date.now();
-
-  if (traffic.lastRaw === null || raw < traffic.lastRaw) {
-    // First poll, or nginx restarted and its counter reset
-    traffic.requests = (traffic.requests ?? 0) + Math.max(0, raw - 1);
-    traffic.window = [];
-  } else {
-    const delta = Math.max(0, raw - traffic.lastRaw - 1);
-    traffic.requests += delta;
-    traffic.window.push({ t: now, n: delta });
+function requestStats() {
+  const oldest = Math.floor(Date.now() / 1000) - 59;
+  for (const second of requestSeconds.keys()) {
+    if (second < oldest) requestSeconds.delete(second);
   }
-  traffic.lastRaw = raw;
-  traffic.active = Math.max(0, active - 1);
-  traffic.window = traffic.window.filter((w) => now - w.t <= 60_000);
-  traffic.perMinute = traffic.window.reduce((sum, w) => sum + w.n, 0);
+  return { total: totalRequests, perMinute: [...requestSeconds.values()].reduce((sum, n) => sum + n, 0) };
+}
+
+function countRequest() {
+  const second = Math.floor(Date.now() / 1000);
+  totalRequests++;
+  requestSeconds.set(second, (requestSeconds.get(second) || 0) + 1);
+  requestStats();
 }
 
 function gitLog(repo) {
@@ -232,18 +227,15 @@ async function readCommits() {
 
 // ---------------------------------------------------------------- state
 
-const info = { containers: [], traffic: null, commits: [] };
+const info = { containers: [], requests: requestStats(), commits: [] };
 
 function tick() {
   return { uptime: parseFloat(fs.readFileSync("/proc/uptime", "utf8")), watching: clients.size, btop: btopUp };
 }
 
 async function refreshInfo() {
-  const [containers] = await Promise.allSettled([readContainers(), readTraffic()]);
-  if (containers.status === "fulfilled") info.containers = containers.value;
-  info.traffic = traffic.requests === null
-    ? null
-    : { requests: traffic.requests, perMinute: traffic.perMinute, active: traffic.active };
+  try { info.containers = await readContainers(); } catch (e) {}
+  info.requests = requestStats();
   broadcast("info", info);
 }
 
@@ -552,7 +544,7 @@ function stream(req, res) {
     screen: Buffer.from(serializer.serialize()).toString("base64"),
     theme: themeCss,
     tick: tick(),
-    info,
+    info: { ...info, requests: requestStats() },
   }));
 
   req.on("close", () => {
@@ -620,6 +612,7 @@ serve("/vendor/addon-webgl.js", require.resolve("@xterm/addon-webgl/lib/addon-we
 
 const server = http.createServer((req, res) => {
   const url = new URL(req.url, "http://localhost");
+  if (url.pathname !== "/healthz" && req.method !== "HEAD") countRequest();
 
   if (url.pathname === "/ask") {
     if (req.method === "POST") return ask(req, res);

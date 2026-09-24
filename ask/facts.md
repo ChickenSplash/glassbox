@@ -23,7 +23,7 @@ PHP, Laravel, Livewire, Filament, JavaScript, TypeScript, React, SASS, MySQL, Do
 - Learning Zone: a learner-facing LMS with its own admin, built on the latest Laravel stack. Laravel, Volt, Flux UI.
 - Projects Panel: a self-hosted dashboard where people post projects as links, with a private gratitude journal alongside. Runs on this homelab at chickensplash.dpdns.org. Laravel 13, Livewire 4 (Volt), Tailwind CSS 4, SQLite. It also receives the portfolio's contact form messages.
 - Portfolio: his personal site at portfolio.chickensplash.dpdns.org, served by nginx on this homelab.
-- Glass box: this page, lab.chickensplash.dpdns.org. Mirrors the homelab's real btop to every visitor live, plus its containers, portfolio traffic and recent commits. Node.js, Server-Sent Events, xterm.js. Source: github.com/ChickenSplash/glassbox.
+- Glass box: this page, lab.chickensplash.dpdns.org. Mirrors the homelab's real btop to every visitor live, plus its containers, glassbox request counts and recent commits. Node.js, Server-Sent Events, xterm.js. Source: github.com/ChickenSplash/glassbox.
 
 ## The homelab (you)
 - A Dell OptiPlex 3060 Micro in a cupboard under the router in Norfolk, UK.

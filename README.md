@@ -1,7 +1,7 @@
 # Glass box
 
 A live page for the homelab that serves it: the real btop, mirrored to every visitor,
-plus its containers, portfolio traffic and recent commits, and a chat box answered by a
+plus its containers, own traffic and recent commits, and a chat box answered by a
 small model on the same CPU.
 
 - **btop:** runs in its own container on a pty (via `socat`) and is served over a unix
@@ -13,7 +13,9 @@ small model on the same CPU.
 - **Frontend:** plain HTML, CSS and JavaScript, with xterm.js and its WebGL renderer.
 - **Docker:** reached only through [wollomatic/socket-proxy](https://github.com/wollomatic/socket-proxy),
   allowlisted to listing containers and reading their stats.
-- **Traffic:** the portfolio's nginx `stub_status`, on a port only the Docker network can reach.
+- **Traffic:** counts requests reaching the glassbox app, with a rolling 60-second
+  window. Health checks and HEAD requests are ignored; Cloudflare-cached assets
+  never reach the app. The total resets when the app restarts.
 - **Commits:** `git log` over read-only mounts of each repo's `.git` directory.
 - **Ask the homelab:** [llama.cpp](https://github.com/ggml-org/llama.cpp) serving Qwen3.5-4B
   (Q4_K_M) on the CPU, on an internal network only the app can reach. The app queues

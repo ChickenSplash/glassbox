@@ -143,9 +143,9 @@ function renderTick(t) {
 }
 
 function renderInfo(info) {
-  if (info.traffic) {
-    $("requests").textContent = info.traffic.requests.toLocaleString("en-GB");
-    $("rpm").textContent = `${info.traffic.perMinute} req`;
+  if (info.requests) {
+    $("requests").textContent = info.requests.total.toLocaleString("en-GB");
+    $("rpm").textContent = `${info.requests.perMinute} req`;
   }
 
   if (info.containers.length) {
