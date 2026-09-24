@@ -220,8 +220,17 @@ h1 { font-size: clamp(2.2rem, 4.6vw, 3.6rem); line-height: 1.08; font-weight: 70
   background: var(--term-bg);
   font: 400 14px/1.5 "Adwaita Mono", ui-monospace, monospace;
 }
-.cli-cmd { margin-bottom: 0.35em; }
-.cli-cmd::before { content: "❯ "; color: var(--term-a); }
+.cli-cmd { display: flex; align-items: baseline; gap: 4ch; margin-bottom: 0.35em; white-space: nowrap; }
+.cli-cmd > :first-child::before { content: "❯ "; color: var(--term-a); }
+/* What the command shows, in plain English for anyone who doesn't read terminals */
+.cli-note {
+  margin-left: auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 12px;
+  color: color-mix(in srgb, var(--muted) 75%, transparent);
+}
 
 .rows { list-style: none; margin: 0; padding: 0; }
 .rows li {
