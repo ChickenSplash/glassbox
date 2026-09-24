@@ -104,6 +104,7 @@ function paletteCss(p) {
     `--term-bg: ${t.background}`,
     `--term-a: ${lighter}`,
     `--term-b: ${darker}`,
+    `--window-inactive: ${c.outline}`,
   ];
   return `:root { ${vars.join("; ")} }`;
 }
