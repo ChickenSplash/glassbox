@@ -27,21 +27,10 @@
     <section class="hero">
       <p class="status" data-state="connecting"><span class="dot"></span><span id="conn">Connecting to the homelab...</span></p>
       <h1>This page is the server.<br><span class="muted">Live from a cupboard in Norfolk, UK.</span></h1>
-      <div class="intro">
-        <p class="lead">
-          A palm-sized Dell OptiPlex under my router hosts my portfolio and side projects.
-          Ask it about me below, then watch its real btop, mirrored live, work on the answer.
-        </p>
-        <dl class="facts">
-          <div><dt>Uptime</dt><dd id="uptime">·</dd></div>
-          <div><dt>Watching now</dt><dd id="watching">·</dd></div>
-          <div><dt title="Requests to glassbox since this app started">Glassbox requests</dt><dd id="requests">·</dd></div>
-          <div><dt>Glassbox · last 60s</dt><dd id="rpm">·</dd></div>
-        </dl>
-      </div>
     </section>
 
-    <section class="stage" aria-label="Ask the homelab, btop live from it, its containers and recent commits">
+    <section class="stage" aria-label="Ask the homelab, its live stats, btop, containers and recent commits">
+      <div class="top">
       <div class="window">
         <div class="ask">
           <div class="ask-log" id="ask-log" aria-live="polite">
@@ -54,8 +43,18 @@
             <label class="ask-prompt" for="ask-input">❯</label>
             <input id="ask-input" type="text" maxlength="400" autocomplete="off" enterkeyhint="send" aria-label="Ask the homelab">
           </form>
-          <p class="ask-keys">↵ to send · type /help</p>
+          <p class="ask-keys">↵ to send · /help</p>
         </div>
+      </div>
+
+      <div class="window stats">
+        <dl class="facts cli" role="region" aria-label="Live stats">
+          <div><dt>Uptime</dt><dd id="uptime">·</dd></div>
+          <div><dt>Watching now</dt><dd id="watching">·</dd></div>
+          <div><dt title="Requests to glassbox since this app started">Glassbox requests</dt><dd id="requests">·</dd></div>
+          <div><dt>Glassbox · last 60s</dt><dd id="rpm">·</dd></div>
+        </dl>
+      </div>
       </div>
 
       <div class="window">
