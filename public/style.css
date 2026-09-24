@@ -127,6 +127,9 @@ h1 { font-size: clamp(2.2rem, 4.6vw, 3.6rem); line-height: 1.08; font-weight: 70
   background: var(--term-bg);
 }
 .term .xterm-viewport { background: var(--term-bg) !important; overflow: hidden; }
+/* View only, so the mouse goes straight through: xterm would otherwise swallow the
+   wheel and stop the page scrolling */
+.term .xterm { pointer-events: none; }
 
 /* Ask the homelab: a terminal in the same window style, laid out like Claude Code */
 @font-face { font-family: "Adwaita Mono"; src: url("fonts/adwaita-mono-regular.woff2") format("woff2"); font-weight: 400; font-display: swap; }
