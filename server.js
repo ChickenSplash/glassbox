@@ -560,7 +560,7 @@ const securityHeaders = {
     "default-src 'self'",
     // xterm.js injects <style> elements for its colours and layout
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-    "font-src https://fonts.gstatic.com",
+    "font-src 'self' https://fonts.gstatic.com",
     "img-src 'self' data:",
     "connect-src 'self'",
     "frame-ancestors 'none'",
@@ -571,7 +571,12 @@ const securityHeaders = {
   "Referrer-Policy": "strict-origin-when-cross-origin",
 };
 
-const types = { ".html": "text/html; charset=utf-8", ".css": "text/css; charset=utf-8", ".js": "text/javascript; charset=utf-8" };
+const types = {
+  ".html": "text/html; charset=utf-8",
+  ".css": "text/css; charset=utf-8",
+  ".js": "text/javascript; charset=utf-8",
+  ".woff2": "font/woff2",
+};
 
 // Every public file is loaded once at start, so there is no path handling on requests
 const files = new Map();
@@ -579,7 +584,12 @@ function serve(route, file) {
   files.set(route, { body: fs.readFileSync(file), type: types[path.extname(file)] || "application/octet-stream" });
 }
 for (const name of fs.readdirSync(path.join(__dirname, "public"))) {
+  if (name === "fonts") continue;
   serve(name === "index.html" ? "/" : `/${name}`, path.join(__dirname, "public", name));
+}
+// Adwaita Mono (OFL, licence alongside), cut down to the characters the chat uses
+for (const name of fs.readdirSync(path.join(__dirname, "public/fonts"))) {
+  if (name.endsWith(".woff2")) serve(`/fonts/${name}`, path.join(__dirname, "public/fonts", name));
 }
 serve("/vendor/xterm.js", require.resolve("@xterm/xterm/lib/xterm.js"));
 serve("/vendor/xterm.css", require.resolve("@xterm/xterm/css/xterm.css"));

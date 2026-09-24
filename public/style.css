@@ -128,67 +128,64 @@ h1 { font-size: clamp(2.2rem, 4.6vw, 3.6rem); line-height: 1.08; font-weight: 70
 }
 .term .xterm-viewport { background: var(--term-bg) !important; overflow: hidden; }
 
-/* Ask the homelab: same window, answers scroll above a joined input and button */
+/* Ask the homelab: a terminal in the same window style, laid out like Claude Code */
+@font-face { font-family: "Adwaita Mono"; src: url("fonts/adwaita-mono-regular.woff2") format("woff2"); font-weight: 400; font-display: swap; }
+@font-face { font-family: "Adwaita Mono"; src: url("fonts/adwaita-mono-bold.woff2") format("woff2"); font-weight: 700; font-display: swap; }
+@font-face { font-family: "Adwaita Mono"; src: url("fonts/adwaita-mono-italic.woff2") format("woff2"); font-style: italic; font-display: swap; }
+
 .ask {
+  --line: 1.5em;
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  height: 360px;
+  height: clamp(320px, 50vh, 440px);
   padding: var(--term-pad);
   border-radius: calc(12px - var(--term-border));
   background: var(--term-bg);
+  color: var(--text);
+  font: 400 14px/1.5 "Adwaita Mono", ui-monospace, monospace;
 }
+/* Blank lines between blocks, as a terminal would print them */
 .ask-log {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: var(--line);
+  padding-bottom: var(--line);
   overflow-y: auto;
-  padding: 4px 4px 0;
-  font-size: 15px;
-  scrollbar-width: thin;
-  scrollbar-color: var(--border) transparent;
+  scrollbar-width: none;
 }
-.ask-hint { margin: auto 0; text-align: center; font-size: 14px; color: var(--muted); }
-.ask-q { font-weight: 500; overflow-wrap: anywhere; }
-.ask-q::before { content: "› "; font-family: "JetBrains Mono", monospace; color: var(--term-a); }
-.ask-a { margin-top: -10px; color: var(--muted); white-space: pre-wrap; overflow-wrap: anywhere; }
-.ask-a.waiting { font-size: 13px; font-style: italic; }
-.ask-a.streaming::after { content: "▍"; color: var(--term-a); animation: blink 1s steps(1) infinite; }
-.ask-a.error { color: var(--bad); }
-@keyframes blink { 50% { opacity: 0; } }
+.ask-log::-webkit-scrollbar { display: none; }
+.ask-log p { white-space: pre-wrap; overflow-wrap: anywhere; }
+.ask-log > :first-child { margin-top: auto; }
+.ask-hint { color: var(--muted); }
+.ask-q::before, .ask-prompt { color: var(--term-a); }
+.ask-q::before { content: "❯ "; }
+.ask-status { color: var(--muted); }
+.ask-status .spin { display: inline-block; width: 1ch; margin-right: 1ch; color: var(--term-a); }
+.ask-status.error { color: var(--bad); }
+.ask-status.error .spin { color: var(--bad); }
+
+/* Claude Code's prompt: ❯ between two rules */
 .ask-form {
   display: flex;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  overflow: hidden;
-  background: var(--surface);
-  transition: border-color .2s;
+  gap: 1ch;
+  padding: 0.35em 0;
+  border-block: 1px solid color-mix(in srgb, var(--muted) 45%, transparent);
 }
-.ask-form:focus-within { border-color: var(--term-a); }
 .ask-form input {
   flex: 1;
   min-width: 0;
-  padding: 11px 14px;
+  padding: 0;
   border: 0;
   outline: 0;
   background: transparent;
   color: var(--text);
+  caret-color: var(--term-a);
   font: inherit;
-  font-size: 15px;
 }
-.ask-form input::placeholder { color: var(--muted); }
-.ask-form button {
-  padding: 0 20px;
-  border: 0;
-  background: var(--accent);
-  color: #fff;
-  font: 600 14px Inter, system-ui, sans-serif;
-  cursor: pointer;
-  transition: filter .2s, opacity .2s;
-}
-.ask-form button:hover { filter: brightness(1.15); }
-.ask-form button:disabled { opacity: .5; cursor: default; filter: none; }
+.ask-keys { margin-top: 0.35em; font-size: 12px; color: var(--muted); }
+/* iOS zooms the page into any input under 16px */
+@media (pointer: coarse) { .ask-form input { font-size: 16px; } }
 
 /* Containers and commits */
 .rows { list-style: none; margin: 0; padding: 0; }
@@ -268,7 +265,7 @@ footer {
   main, footer { padding-left: 16px; padding-right: 16px; }
   .nav { padding-left: 16px; padding-right: 16px; }
   :root { --term-pad: 10px; }
-  .ask { height: 320px; }
+  .ask { font-size: 13px; }
   .hero { padding: 56px 0 48px; }
   .rows li { flex-wrap: wrap; gap: 4px 12px; }
   .rows .meta { margin-left: 0; width: 100%; }

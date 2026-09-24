@@ -48,9 +48,10 @@
             <p class="ask-hint">Ask me about Emanuel, his projects or this server. A small AI model answers on this CPU with no GPU, so replies take a few seconds and can be wrong.</p>
           </div>
           <form class="ask-form" id="ask-form">
-            <input id="ask-input" type="text" maxlength="400" placeholder="Ask the homelab..." autocomplete="off" aria-label="Your question">
-            <button type="submit">Send</button>
+            <label class="ask-prompt" for="ask-input">❯</label>
+            <input id="ask-input" type="text" maxlength="400" autocomplete="off" enterkeyhint="send" aria-label="Ask the homelab">
           </form>
+          <p class="ask-keys">↵ to send</p>
         </div>
       </div>
 

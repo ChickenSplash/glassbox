@@ -173,10 +173,30 @@ function renderInfo(info) {
 const askLog = $("ask-log");
 const askForm = $("ask-form");
 const askInput = $("ask-input");
-const askButton = askForm.querySelector("button");
 // The last few turns go back with each question, so follow-ups make sense
 const history = [];
 let asking = false;
+
+// Claude Code's status line: a spinning glyph and a verb while it works, then how long
+const SPIN = ["·", "✢", "✳", "✶", "✻", "✽", "✻", "✶", "✳", "✢"];
+const VERBS = [
+  ["Brewing", "Brewed"], ["Sautéing", "Sautéed"], ["Simmering", "Simmered"], ["Baking", "Baked"],
+  ["Pondering", "Pondered"], ["Churning", "Churned"], ["Whisking", "Whisked"], ["Mulling", "Mulled"],
+  ["Crunching", "Crunched"], ["Stewing", "Stewed"],
+];
+const clock = new Intl.DateTimeFormat("en-GB", { hour: "numeric", minute: "2-digit" });
+const took = (ms) => {
+  const s = Math.max(1, Math.round(ms / 1000));
+  return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${s % 60}s`;
+};
+
+function statusLine() {
+  const line = el("p", "ask-status");
+  const spin = el("span", "spin", SPIN[0]);
+  const text = el("span");
+  line.append(spin, text);
+  return { line, spin, text };
+}
 
 // Only follow the answer down if the reader has not scrolled up to read something
 function withScroll(update) {
@@ -190,18 +210,26 @@ askForm.addEventListener("submit", async (event) => {
   const question = askInput.value.trim();
   if (!question || asking) return;
   asking = true;
-  askButton.disabled = true;
   askInput.value = "";
 
-  const answer = el("p", "ask-a waiting", "Sending...");
+  const [verb, done] = VERBS[Math.floor(Math.random() * VERBS.length)];
+  const started = Date.now();
+  const answer = el("p", "ask-a");
+  const status = statusLine();
+  let waiting = "";
+  let frame = 0;
+  const spinner = setInterval(() => {
+    status.spin.textContent = SPIN[++frame % SPIN.length];
+    status.text.textContent = waiting || `${verb}… (${took(Date.now() - started)})`;
+  }, 120);
+
   withScroll(() => {
     askLog.querySelector(".ask-hint")?.remove();
-    askLog.append(el("p", "ask-q", question), answer);
+    askLog.append(el("p", "ask-q", question), status.line);
   });
   history.push({ role: "user", content: question });
 
   let text = "";
-  const show = (update) => withScroll(update);
   try {
     const response = await fetch("/ask", {
       method: "POST",
@@ -217,37 +245,36 @@ askForm.addEventListener("submit", async (event) => {
     const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
     let buffer = "";
     for (;;) {
-      const { value, done } = await reader.read();
-      if (done) break;
+      const { value, done: ended } = await reader.read();
+      if (ended) break;
       buffer += value;
       const lines = buffer.split("\n");
       buffer = lines.pop();
       for (const line of lines.filter(Boolean)) {
         const data = JSON.parse(line);
         if (data.error) throw new Error(data.error);
-        if (data.queue) show(() => { answer.textContent = `Waiting in line · ${data.queue} ahead of you`; });
-        else if (data.queue === 0) show(() => { answer.textContent = "Thinking..."; });
+        if (data.queue) waiting = `Queued · ${data.queue} ahead of you`;
+        else if (data.queue === 0) waiting = "";
         if (data.t) {
           text += data.t;
-          show(() => {
-            answer.className = "ask-a streaming";
-            answer.textContent = text.trimStart();
+          withScroll(() => {
+            if (!answer.isConnected) status.line.before(answer);
+            answer.textContent = text.trim();
           });
         }
       }
     }
     if (!text) throw new Error("No answer came back. Try again shortly.");
     history.push({ role: "assistant", content: text.trim() });
+    status.text.textContent = `${done} for ${took(Date.now() - started)} · done ${clock.format(new Date())}`;
   } catch (error) {
     history.pop();
-    show(() => {
-      answer.className = "ask-a error";
-      answer.textContent = text ? `${text.trim()}\n\n${error.message}` : error.message;
-    });
+    status.line.classList.add("error");
+    status.text.textContent = error.message;
   }
-  answer.classList.remove("streaming", "waiting");
+  clearInterval(spinner);
+  status.spin.textContent = "✻";
   asking = false;
-  askButton.disabled = false;
 });
 
 // ---------------------------------------------------------------- stream
