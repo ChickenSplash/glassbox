@@ -41,7 +41,7 @@
       </div>
     </section>
 
-    <section class="stage" aria-label="Ask the homelab, and btop live from it">
+    <section class="stage" aria-label="Ask the homelab, btop live from it, its containers and recent commits">
       <div class="window">
         <div class="ask">
           <div class="ask-log" id="ask-log" aria-live="polite">
@@ -61,19 +61,23 @@
       <div class="window">
         <div class="term" id="term"></div>
       </div>
+
+      <div class="columns">
+        <div class="window">
+          <div class="cli" role="region" aria-label="Containers">
+            <p class="cli-cmd">docker ps</p>
+            <ul class="rows" id="containers"><li class="empty muted">Waiting for Docker...</li></ul>
+          </div>
+        </div>
+
+        <div class="window">
+          <div class="cli" role="region" aria-label="Recent commits">
+            <p class="cli-cmd">git log</p>
+            <ul class="rows" id="commits"><li class="empty muted">Reading git history...</li></ul>
+          </div>
+        </div>
+      </div>
     </section>
-
-    <div class="columns">
-      <section>
-        <h2>Containers</h2>
-        <ul class="rows" id="containers"><li class="empty muted">Waiting for Docker...</li></ul>
-      </section>
-
-      <section>
-        <h2>Recent commits</h2>
-        <ul class="rows" id="commits"><li class="empty muted">Reading git history...</li></ul>
-      </section>
-    </div>
 
     <section>
       <h2>How this works</h2>

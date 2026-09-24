@@ -209,19 +209,32 @@ h1 { font-size: clamp(2.2rem, 4.6vw, 3.6rem); line-height: 1.08; font-weight: 70
 /* iOS zooms the page into any input under 16px */
 @media (pointer: coarse) { .ask-form input { font-size: 16px; } }
 
-/* Containers and commits */
+/* Containers and commits, as command-line apps in the same windows, side by side */
+.columns { display: grid; gap: 24px; }
+.window:has(.cli) { display: flex; }
+.cli {
+  flex: 1;
+  min-width: 0;
+  padding: var(--term-pad);
+  border-radius: calc(12px - var(--term-border));
+  background: var(--term-bg);
+  font: 400 14px/1.5 "Adwaita Mono", ui-monospace, monospace;
+}
+.cli-cmd { margin-bottom: 0.35em; }
+.cli-cmd::before { content: "❯ "; color: var(--term-a); }
+
 .rows { list-style: none; margin: 0; padding: 0; }
 .rows li {
   display: flex;
   align-items: baseline;
-  gap: 16px;
-  padding: 14px 0;
+  gap: 2ch;
+  padding: 10px 0;
   border-bottom: 1px dashed var(--border);
 }
 .rows li:last-child { border-bottom: 0; }
 .rows .empty { display: block; font-size: 14px; }
 .rows .name { font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
-.rows .meta { margin-left: auto; font: 400 12px "JetBrains Mono", monospace; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.rows .meta { margin-left: auto; font-size: 12px; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .rows .detail { font-size: 14px; color: var(--muted); }
 .state { flex-shrink: 0; width: 8px; height: 8px; border-radius: 50%; background: var(--muted); align-self: center; }
 .state.running { background: var(--ok); }
@@ -235,7 +248,7 @@ h1 { font-size: clamp(2.2rem, 4.6vw, 3.6rem); line-height: 1.08; font-weight: 70
   padding: 2px 8px;
   border: 1px solid var(--border);
   border-radius: 6px;
-  font: 400 12px "JetBrains Mono", monospace;
+  font-size: 12px;
   color: var(--muted);
 }
 
@@ -273,13 +286,7 @@ footer {
   .intro .facts { display: grid; grid-template-columns: repeat(2, auto); justify-content: start; }
   .hero .status { grid-column: 1 / -1; justify-self: start; }
   .intro .lead { margin-top: 0; }
-  .columns {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 0 64px;
-    border-top: 1px solid var(--border);
-  }
-  .columns > section { border-top: 0; min-width: 0; }
+  .columns { grid-template-columns: 1fr 1fr; }
   .how { grid-template-columns: 1fr 1fr; gap: 20px 64px; }
 }
 
