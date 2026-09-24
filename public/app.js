@@ -259,11 +259,10 @@ askForm.addEventListener("submit", async (event) => {
         if (data.error) throw new Error(data.error);
         if (data.queue) waiting = `Queued · ${data.queue} ahead of you`;
         else if (data.queue === 0) waiting = "";
-        // Claude Code's tool line: what ran, then how it went
+        // What the model did, in the same style as the status line
         if (data.tool) {
           const line = el("p", `ask-tool${data.tool.ok ? "" : " failed"}`);
-          line.append(el("span", "dot", "●"), el("span", "", `${data.tool.name}(${data.tool.arg})`),
-            el("span", "result", `⎿ ${data.tool.ok ? "changed" : "not changed"}`));
+          line.append(el("span", "mark", data.tool.ok ? "✓" : "✗"), el("span", "", data.tool.note));
           withScroll(() => status.line.before(line));
         }
         if (data.t) {

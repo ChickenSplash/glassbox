@@ -289,23 +289,32 @@ function currentTheme() {
   }
 }
 
-// Returns what happened, for the model to pass on
+// Returns what happened: `result` for the model to pass on, `note` for the page
 function setTheme(colour, ip) {
-  if (!THEMES.includes(colour)) return { ok: false, result: `There is no ${colour} theme. The choices are: ${THEMES.join(", ")}.` };
-  if (colour === currentTheme()) return { ok: false, result: `Nothing to do: the theme is already ${colour}.` };
+  const fail = (note, result) => ({ ok: false, note: `Couldn't change the theme to ${colour}: ${note}`, result });
+  if (!THEMES.includes(colour)) return fail("no such theme", `There is no ${colour} theme. The choices are: ${THEMES.join(", ")}.`);
+  const current = currentTheme();
+  if (colour === current) return fail("it already is", `Nothing to do: the theme is already ${colour}.`);
   const now = Date.now();
-  const still = `Not changed, the theme is still ${currentTheme() || "the same"}.`;
   const mine = (themeLog.get(ip) ?? -Infinity) + THEME_PER_IP - now;
-  if (mine > 0) return { ok: false, result: `${still} This visitor changed it recently, and each visitor can only change it once every 10 minutes. They can ask again in ${Math.ceil(mine / 60_000)} minutes.` };
+  if (mine > 0) {
+    const minutes = Math.ceil(mine / 60_000);
+    return fail(`you can change it again in ${minutes} min`,
+      `Not changed, it is still ${current}. You (the visitor you are talking to) changed the theme yourself less than 10 minutes ago, and each visitor gets one change every 10 minutes. You can change it again in ${minutes} minutes.`);
+  }
   const anyone = lastThemeChange + THEME_COOLDOWN - now;
-  if (anyone > 0) return { ok: false, result: `${still} Another visitor changed it under a minute ago, so it is locked for ${Math.ceil(anyone / 1000)} more seconds.` };
+  if (anyone > 0) {
+    const seconds = Math.ceil(anyone / 1000);
+    return fail(`locked for ${seconds}s after another change`,
+      `Not changed, it is still ${current}. A different visitor changed it under a minute ago, so it is locked for ${seconds} more seconds.`);
+  }
 
   const tmp = path.join(path.dirname(THEME_CHOICE), ".theme.tmp");
   fs.writeFileSync(tmp, `${colour}\n`);
   fs.renameSync(tmp, THEME_CHOICE);
   lastThemeChange = now;
   themeLog.set(ip, now);
-  return { ok: true, result: `Done: the theme is now ${colour}. The page recolours itself in a second or two.` };
+  return { ok: true, note: `Changed the theme to ${colour}`, result: `Done: the theme is now ${colour}. The page recolours itself in a second or two.` };
 }
 setInterval(() => {
   for (const [ip, t] of themeLog) if (Date.now() - t > THEME_PER_IP) themeLog.delete(ip);
@@ -539,10 +548,10 @@ async function streamAnswer(messages, send, signal, ip) {
   try {
     colour = String(JSON.parse(call.arguments).colour).toLowerCase();
   } catch (e) {}
-  const { ok, result } = call.name === "set_theme" && colour
+  const { ok, note, result } = call.name === "set_theme" && colour
     ? setTheme(colour, ip)
-    : { ok: false, result: "That tool does not exist." };
-  send({ tool: { name: "Theme", arg: colour || "?", ok } });
+    : { ok: false, note: "Couldn't change the theme", result: "That tool does not exist." };
+  send({ tool: { ok, note } });
 
   await streamReply(messages, send, signal, [
     { role: "assistant", content: "", tool_calls: [{ id: "call_0", type: "function", function: call }] },
