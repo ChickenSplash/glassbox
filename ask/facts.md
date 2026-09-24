@@ -1,7 +1,7 @@
 # Facts for "Ask the homelab"
 
-Everything the model knows. It is told to answer only from this file, so anything left
-out gets "I don't know". Public repo: keep it to things you are happy to publish.
+Facts about Emanuel and his projects. For behaviour and personality, edit prompt.md.
+Public repo: keep it to things you are happy to publish.
 Read on every question, so edits apply straight away with no rebuild.
 
 ## Emanuel

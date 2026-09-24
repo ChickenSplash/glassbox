@@ -18,7 +18,10 @@ small model on the same CPU.
 - **Ask the homelab:** [llama.cpp](https://github.com/ggml-org/llama.cpp) serving Qwen3.5-4B
   (Q4_K_M) on the CPU, on an internal network only the app can reach. The app queues
   questions (one answer at a time), rate-limits per visitor and streams the reply. The
-  model only knows [`ask/facts.md`](ask/facts.md), which is read on every question.
+  model gets [`ask/facts.md`](ask/facts.md) for details about Emanuel and his projects.
+  Its tone and conversational rules are in [`ask/prompt.md`](ask/prompt.md). Both files
+  are read on every question, so edits to either apply without a rebuild; the app
+  re-warms the model's prompt cache when they change.
 
 ## Run
 
