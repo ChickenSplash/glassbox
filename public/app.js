@@ -143,11 +143,13 @@ function renderTick(t) {
 }
 
 let model = null;
+// Held directly, since /help and /clear take the hint out of the page and back
+const modelLine = $("ask-model");
 
 function renderInfo(info) {
   if (info.model) {
     model = info.model;
-    $("ask-model")?.replaceChildren(model);
+    modelLine.replaceChildren(model);
   }
   if (info.requests) {
     $("requests").textContent = info.requests.total.toLocaleString("en-GB");
@@ -183,6 +185,8 @@ function renderInfo(info) {
 const askLog = $("ask-log");
 const askForm = $("ask-form");
 const askInput = $("ask-input");
+// Kept for /clear, which puts it back
+const askHint = askLog.querySelector(".ask-hint");
 // The last few turns go back with each question, so follow-ups make sense
 const history = [];
 let asking = false;
@@ -212,7 +216,8 @@ const helpText = () => `You are chatting with ${model || "a small local model"},
 
 You can:
 - Ask anything
-- Change the homelab's theme`;
+- Change the homelab's theme
+- Type /clear to start over`;
 
 // Only follow the answer down if the reader has not scrolled up to read something
 function withScroll(update) {
@@ -233,6 +238,12 @@ askForm.addEventListener("submit", async (event) => {
       askLog.querySelector(".ask-hint")?.remove();
       askLog.append(el("p", "ask-q", question), el("p", "ask-a", helpText()));
     });
+    return;
+  }
+  // Forgets the conversation too, so the model starts fresh
+  if (question.toLowerCase() === "/clear") {
+    history.length = 0;
+    askLog.replaceChildren(askHint);
     return;
   }
   asking = true;
