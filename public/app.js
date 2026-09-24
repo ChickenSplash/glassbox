@@ -143,6 +143,7 @@ function renderTick(t) {
 }
 
 function renderInfo(info) {
+  if (info.model) $("ask-model")?.replaceChildren(info.model);
   if (info.requests) {
     $("requests").textContent = info.requests.total.toLocaleString("en-GB");
     $("rpm").textContent = `${info.requests.perMinute} req`;

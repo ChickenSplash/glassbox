@@ -174,9 +174,9 @@ h1 { font-size: clamp(2.2rem, 4.6vw, 3.6rem); line-height: 1.08; font-weight: 70
 }
 .ask-log::-webkit-scrollbar { display: none; }
 .ask-log p { white-space: pre-wrap; overflow-wrap: anywhere; }
-.ask-hint { margin: 0; padding: 0; list-style: none; color: var(--muted); }
-.ask-hint li { padding-left: 2ch; text-indent: -2ch; }
-.ask-hint li::before { content: "- "; color: var(--term-a); }
+.ask-hint { margin: auto; text-align: center; }
+.ask-title { font-size: 1.6em; font-weight: 700; }
+.ask-model { min-height: var(--line); color: var(--muted); }
 .ask-q::before, .ask-prompt { color: var(--term-a); }
 .ask-q::before { content: "❯ "; }
 .ask-status { color: var(--muted); }

@@ -223,6 +223,14 @@ function gitLog(repo) {
   });
 }
 
+// Whatever llama.cpp has loaded, so swapping the model file needs no page edit.
+// "/models/Qwen3.5-4B-Q4_K_M.gguf" becomes "Qwen3.5-4B · Q4_K_M"
+async function readModel() {
+  const props = await getJson(`${LLM}/props`);
+  const name = path.basename(props.model_path, ".gguf");
+  return name.replace(/-((?:I?Q\d|B?F\d)\w*)$/i, " · $1");
+}
+
 async function readCommits() {
   const logs = await Promise.all(REPOS.map(gitLog));
   return logs.flat().sort((a, b) => b.time - a.time).slice(0, 8);
@@ -230,7 +238,7 @@ async function readCommits() {
 
 // ---------------------------------------------------------------- state
 
-const info = { containers: [], requests: requestStats(), commits: [] };
+const info = { containers: [], requests: requestStats(), commits: [], model: null };
 
 function tick() {
   return { uptime: parseFloat(fs.readFileSync("/proc/uptime", "utf8")), watching: clients.size, btop: btopUp };
@@ -238,6 +246,7 @@ function tick() {
 
 async function refreshInfo() {
   try { info.containers = await readContainers(); } catch (e) {}
+  try { info.model = await readModel(); } catch (e) {}
   info.requests = requestStats();
   broadcast("info", info);
 }
