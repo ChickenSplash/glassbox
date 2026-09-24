@@ -234,6 +234,7 @@ askForm.addEventListener("submit", async (event) => {
   history.push({ role: "user", content: question });
 
   let text = "";
+  let tool = null;
   try {
     const response = await fetch("/ask", {
       method: "POST",
@@ -261,6 +262,7 @@ askForm.addEventListener("submit", async (event) => {
         else if (data.queue === 0) waiting = "";
         // What the model did, in the same style as the status line
         if (data.tool) {
+          tool = data.tool;
           const line = el("p", `ask-tool${data.tool.ok ? "" : " failed"}`);
           line.append(el("span", "mark", data.tool.ok ? "✓" : "✗"), el("span", "", data.tool.note));
           withScroll(() => status.line.before(line));
@@ -275,7 +277,8 @@ askForm.addEventListener("submit", async (event) => {
       }
     }
     if (!text) throw new Error("No answer came back. Try again shortly.");
-    history.push({ role: "assistant", content: text.trim() });
+    // The server needs the tool call back to show the model it really made it
+    history.push({ role: "assistant", content: text.trim(), ...(tool && { theme: { colour: tool.colour, result: tool.result } }) });
     status.text.textContent = `${done} for ${took(Date.now() - started)} · done ${clock.format(new Date())}`;
   } catch (error) {
     history.pop();

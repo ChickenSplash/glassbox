@@ -276,6 +276,21 @@ const TOOLS = [{
   },
 }];
 
+// A 4B model sometimes answers "done, it's blue now" without calling the tool,
+// especially after a few changes in a row, and forcing the call makes it ramble.
+// So a message that names a preset and reads as a request, not a question about it
+// ("make it blue", "pink please", "can you go teal?"), makes the call for it; the
+// model is left the vaguer requests ("make it look like the sea").
+function requestedTheme(question) {
+  const q = question.toLowerCase();
+  const named = THEMES.filter((name) => new RegExp(`\\b${name}\\b`).test(q));
+  if (named.length !== 1) return null;
+  if (/^(what|which|why|how|is|are|does|do|was|were|who|when|where)\b/.test(q)) return null;
+  const request = (q.split(/\s+/).length <= 4 && !/\b(like|love|hate|nice|cool|ugly)\b/.test(q))
+    || /\b(make|set|change|switch|turn|go|use|paint|try|apply|want|give|can|could|would|let's|lets)\b/.test(q);
+  return request ? named[0] : null;
+}
+
 function currentTheme() {
   try {
     return fs.readFileSync(THEME_CHOICE, "utf8").trim();
@@ -294,7 +309,7 @@ function setTheme(colour) {
   const tmp = path.join(path.dirname(THEME_CHOICE), ".theme.tmp");
   fs.writeFileSync(tmp, `${colour}\n`);
   fs.renameSync(tmp, THEME_CHOICE);
-  return { ok: true, note: `Changed the theme to ${colour}`, result: `Done: the theme is now ${colour}. The page recolours itself in a second or two.` };
+  return { ok: true, note: `Changed the theme to ${colour}`, result: `Changed: the theme is now ${colour}.` };
 }
 
 // Prompt and facts are both mounted read-only and reloaded on each request, so the
@@ -337,8 +352,9 @@ function liveContext(messages) {
   if (/\b(commits?|latest change|recent change)\b/i.test(question) && info.commits[0]) {
     parts.push(`Latest commit: "${info.commits[0].subject}" in ${info.commits[0].repo}`);
   }
-  if (/\b(themes?|colou?rs?)\b/i.test(question) && currentTheme()) {
-    parts.push(`Current theme: ${currentTheme()}`);
+  if (/\b(themes?|colou?rs?|look like|make it|turn it|go)\b/i.test(question)) {
+    if (currentTheme()) parts.push(`Current theme: ${currentTheme()}`);
+    parts.push("Only a set_theme call changes the theme; saying it changed does nothing");
   }
   return parts.length ? `\n\n(Current server data, use only if relevant: ${parts.join("; ")})` : "";
 }
@@ -355,12 +371,31 @@ function cleanHistory(messages) {
   if (!Array.isArray(messages)) return null;
   const turns = messages
     .filter((m) => m && (m.role === "user" || m.role === "assistant") && typeof m.content === "string")
-    .map((m) => ({ role: m.role, content: m.content.trim().slice(0, m.role === "user" ? 400 : 1200) }))
+    .map((m) => ({
+      role: m.role,
+      content: m.content.trim().slice(0, m.role === "user" ? 400 : 1200),
+      // A theme change this answer made, sent back so the model sees it really called
+      // the tool. Without it, a few "Done, it's blue now" replies in a row teach it
+      // to just say so and skip the call.
+      ...(m.role === "assistant" && THEMES.includes(m.theme?.colour) && typeof m.theme.result === "string"
+        && { theme: { colour: m.theme.colour, result: m.theme.result.slice(0, 300) } }),
+    }))
     .filter((m) => m.content)
     .slice(-(ASK_TURNS * 2 - 1));
   if (!turns.length || turns.at(-1).role !== "user") return null;
   while (turns[0].role !== "user") turns.shift();
   return turns;
+}
+
+// Past answers that changed the theme become the tool call, its result and the reply
+function expandHistory(messages) {
+  return messages.flatMap((m, i) => m.theme
+    ? [
+      { role: "assistant", content: "", tool_calls: [{ id: `call_${i}`, type: "function", function: { name: "set_theme", arguments: JSON.stringify({ colour: m.theme.colour }) } }] },
+      { role: "tool", tool_call_id: `call_${i}`, content: m.theme.result },
+      { role: "assistant", content: m.content },
+    ]
+    : [{ role: m.role, content: m.content }]);
 }
 
 const askLog = new Map();
@@ -481,7 +516,7 @@ function complete(messages, options) {
       ...options.body,
       messages: [
         { role: "system", content: systemPrompt() },
-        ...messages.slice(0, -1),
+        ...expandHistory(messages.slice(0, -1)),
         { role: "user", content: `${messages.at(-1).content}${liveContext(messages)}` },
         ...(options.after || []),
       ],
@@ -518,7 +553,10 @@ try {
 // that is done here and the model is asked again, with the outcome, for its reply.
 async function streamAnswer(messages, send, signal) {
   signal = AbortSignal.any([signal, AbortSignal.timeout(120_000)]);
-  const call = await streamReply(messages, send, signal);
+  const requested = requestedTheme(messages.at(-1).content);
+  const call = requested
+    ? { name: "set_theme", arguments: JSON.stringify({ colour: requested }) }
+    : await streamReply(messages, send, signal);
   if (!call) return;
 
   let colour;
@@ -528,7 +566,7 @@ async function streamAnswer(messages, send, signal) {
   const { ok, note, result } = call.name === "set_theme" && colour
     ? setTheme(colour)
     : { ok: false, note: "Couldn't change the theme", result: "That tool does not exist." };
-  send({ tool: { ok, note } });
+  send({ tool: { ok, note, colour, result } });
 
   await streamReply(messages, send, signal, [
     { role: "assistant", content: "", tool_calls: [{ id: "call_0", type: "function", function: call }] },
