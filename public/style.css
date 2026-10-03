@@ -97,7 +97,7 @@ section h2 {
 
 /* Hero */
 .hero { padding-bottom: 64px; }
-.hero-location { margin-top: 16px; font-size: clamp(1rem, 2vw, 1.5rem); color: var(--text); }
+.hero-location { margin-top: 16px; font-size: clamp(1.6rem, 3.2vw, 2.5rem); line-height: 1.08; font-weight: 700; letter-spacing: -0.02em; color: var(--muted); }
 .live { padding-top: 96px; margin-bottom: 28px; }
 .status {
   flex-shrink: 0;
