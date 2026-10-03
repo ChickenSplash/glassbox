@@ -334,8 +334,12 @@ h1 { font-size: clamp(2.2rem, 4.6vw, 3.6rem); line-height: 1.08; font-weight: 70
 .project-source:hover { color: var(--text); }
 .project-source:focus-visible { outline: 2px solid var(--term-a); outline-offset: 4px; }
 .project-case-study { margin-top: 18px; }
-.project-case-study summary { width: fit-content; }
-.case-study-copy { display: grid; gap: 14px; margin-top: 18px; }
+.project-case-study summary { display: flex; align-items: center; gap: 12px; width: fit-content; list-style: none; }
+.project-case-study summary::-webkit-details-marker { display: none; }
+.project-case-study summary .chevron { flex-shrink: 0; transform: none; transition-duration: .22s; }
+.project-case-study summary[aria-expanded="true"] .chevron { transform: rotate(90deg); }
+.case-study-content { overflow: hidden; }
+.case-study-copy { display: grid; gap: 14px; padding-top: 18px; }
 .contact-note { margin-bottom: 18px; color: var(--muted); }
 .contact-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 24px; }
 .copy-status { font-size: 14px; color: var(--muted); }
@@ -354,13 +358,11 @@ h1 { font-size: clamp(2.2rem, 4.6vw, 3.6rem); line-height: 1.08; font-weight: 70
 .copy.copied .icon-copy { display: none; }
 .copy.copied .icon-check { display: block; }
 
-/* Portfolio contact form, in the same window style as the chat */
+/* Plain contact form, without the homelab's window frame */
 .contact-form {
+  position: relative;
   display: grid;
   gap: 14px;
-  padding: var(--term-pad);
-  border-radius: calc(12px - var(--term-border));
-  background: var(--term-bg);
 }
 .field-row { display: grid; gap: 14px; }
 .field { display: grid; gap: 6px; }
@@ -435,7 +437,7 @@ footer {
 @media (max-width: 999px) {
   .live { display: block; }
   /* The stats open below, so the arrow points down, and up to close them */
-  .chevron { transform: rotate(90deg); }
+  .status .chevron { transform: rotate(90deg); }
   .status[aria-expanded="true"] .chevron { transform: rotate(-90deg); }
   .stats { grid-template-columns: none; grid-template-rows: 0fr; transition-property: grid-template-rows; }
   .stats.open { grid-template-columns: none; grid-template-rows: 1fr; }

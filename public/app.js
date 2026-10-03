@@ -447,6 +447,35 @@ show(viewFor(location.pathname) || viewFor("/"));
 
 // ---------------------------------------------------------------- contact
 
+// Animate native disclosures, keeping them open until the closing motion finishes.
+// Delegation also covers views fetched by in-page navigation and keyboard clicks.
+const disclosureAnimations = new WeakMap();
+document.addEventListener("click", (event) => {
+  const summary = event.target.closest(".project-case-study summary");
+  if (!summary) return;
+  event.preventDefault();
+  const details = summary.parentElement;
+  const content = details.querySelector(".case-study-content");
+  const opening = summary.getAttribute("aria-expanded") !== "true";
+  const from = details.open ? content.getBoundingClientRect().height : 0;
+  disclosureAnimations.get(details)?.cancel();
+  summary.setAttribute("aria-expanded", opening);
+  details.open = true;
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    details.open = opening;
+    return;
+  }
+  const animation = content.animate(
+    [{ height: `${from}px` }, { height: `${opening ? content.scrollHeight : 0}px` }],
+    { duration: 220, easing: "cubic-bezier(.2, .8, .2, 1)" },
+  );
+  disclosureAnimations.set(details, animation);
+  animation.onfinish = () => {
+    details.open = opening;
+    disclosureAnimations.delete(details);
+  };
+});
+
 // Delegated so copying also works when navigation fetches the portfolio later.
 document.addEventListener("click", async (event) => {
   const button = event.target.closest(".copy");

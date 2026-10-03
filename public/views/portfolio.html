@@ -22,11 +22,16 @@
           <h3>Task Space</h3>
           <p>A Rust space simulator that turns task lists into star systems and tasks into planets. Explore a procedurally generated galaxy with simulated orbits, built for both the browser and desktop.</p>
           <p class="project-stack">Rust · Bevy · WebAssembly · Axum</p>
+          <div class="project-actions">
+            <a class="send" href="https://space.chickensplash.dpdns.org" target="_blank" rel="noopener">Explore Task Space ↗</a>
+          </div>
           <details class="project-case-study">
-            <summary class="send">About the project</summary>
+            <summary class="send" aria-expanded="false">About the project<svg class="chevron" viewBox="0 0 10 10" aria-hidden="true"><path d="M3.75 1.5 7.25 5l-3.5 3.5"/></svg></summary>
+            <div class="case-study-content">
             <div class="case-study-copy">
               <p>Task Space combines a procedurally generated galaxy with a practical task inspector. Lists map to star systems and tasks to planets, with read-only ClickUp integration and fictional demo data.</p>
               <p>The Rust simulation powers a Bevy client on desktop and in the browser through WebAssembly. The homelab hosts the browser build and its Axum backend; your device handles the rendering.</p>
+            </div>
             </div>
           </details>
         </article>
@@ -35,11 +40,13 @@
           <p class="project-context">Premier Education Group · BMS feature</p>
           <p>Parents couldn’t always see what their children would be doing at holiday camp. I built a timetable creator in the BMS so franchisees can create and publish schedules directly to the course booking page.</p>
           <details class="project-case-study">
-            <summary class="send">Read the case study</summary>
+            <summary class="send" aria-expanded="false">Read the case study<svg class="chevron" viewBox="0 0 10 10" aria-hidden="true"><path d="M3.75 1.5 7.25 5l-3.5 3.5"/></svg></summary>
+            <div class="case-study-content">
             <div class="case-study-copy">
               <p><strong>The problem.</strong> Timetables were created and shared separately by individual franchisees, leaving parents with little information about the day’s activities when booking.</p>
               <p><strong>My contribution.</strong> I built a timetable creator within the BMS, allowing franchisees to create their own schedules and publish them to the course booking page at the press of a button.</p>
               <p><strong>The result.</strong> Parents can see the planned activities before booking, while timetable creation and publishing sit within one workflow.</p>
+            </div>
             </div>
           </details>
         </article>
@@ -66,7 +73,6 @@
         </div>
       </div>
       <p class="copy-status" role="status" aria-live="polite"></p>
-      <div class="window">
         <form class="contact-form" action="/api/contact" method="post" novalidate>
           <div class="field-row">
             <label class="field">
@@ -89,6 +95,5 @@
             <p class="form-status" role="status" aria-live="polite"></p>
           </div>
         </form>
-      </div>
     </section>
     </div>
