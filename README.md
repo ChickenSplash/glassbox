@@ -11,6 +11,13 @@ small model on the same CPU.
   Server-Sent Events, gzip-flushed per frame. A headless xterm.js keeps a copy of the
   screen so new viewers start from the current picture.
 - **Frontend:** plain HTML, CSS and JavaScript, with xterm.js and its WebGL renderer.
+- **Pages:** each extra page is a view in `public/views/<name>.html`, served at `/<name>`
+  inside the glass box page. Links between pages fetch the view and swap it in place
+  (like Livewire's `wire:navigate`), so the header, footer, live pill and stream stay up,
+  and the glass box view is only hidden, never torn down.
+- **Portfolio:** `/portfolio`, for now just the contact form. The app forwards
+  `/api/contact` to [projects-panel](https://github.com/ChickenSplash/projects-panel)
+  (`project-panel:3000` on the `edge` network), which stores and emails the message.
 - **Docker:** reached only through [wollomatic/socket-proxy](https://github.com/wollomatic/socket-proxy),
   allowlisted to listing containers and reading their stats.
 - **Traffic:** counts requests reaching the glassbox app, with a rolling 60-second

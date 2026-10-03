@@ -1,0 +1,29 @@
+    <div class="view" data-path="/portfolio" data-title="Portfolio · Emanuel Correia">
+    <section class="contact" aria-labelledby="contact-title">
+      <h2 id="contact-title">Contact</h2>
+      <div class="window">
+        <form class="contact-form" action="/api/contact" method="post" novalidate>
+          <div class="field-row">
+            <label class="field">
+              <span>Email</span>
+              <input type="email" name="email" autocomplete="email" placeholder="you@example.com" required maxlength="255">
+            </label>
+            <label class="field">
+              <span>Subject</span>
+              <input type="text" name="subject" placeholder="What's it about?" required maxlength="150">
+            </label>
+          </div>
+          <label class="field">
+            <span>Message</span>
+            <textarea name="message" rows="5" placeholder="Tell me a bit more..." required maxlength="5000"></textarea>
+          </label>
+          <!-- Honeypot: hidden from people, bots fill it in and get dropped -->
+          <label class="hp" aria-hidden="true">Website <input type="text" name="website" tabindex="-1" autocomplete="off"></label>
+          <div class="form-foot">
+            <button class="send" type="submit">Send message</button>
+            <p class="form-status" role="status" aria-live="polite"></p>
+          </div>
+        </form>
+      </div>
+    </section>
+    </div>

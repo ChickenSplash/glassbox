@@ -16,21 +16,34 @@
 </head>
 <body>
   <header class="nav">
-    <a class="logo" href="https://portfolio.chickensplash.dpdns.org" aria-label="Portfolio">EC</a>
+    <a class="logo" href="/" aria-label="Glass box">EC</a>
     <nav>
-      <a href="https://portfolio.chickensplash.dpdns.org">Portfolio</a>
+      <a href="/portfolio">Portfolio</a>
       <a href="https://github.com/ChickenSplash/glassbox" target="_blank" rel="noopener">Source ↗</a>
     </nav>
   </header>
 
   <main>
+    <div class="live">
+      <button class="status" type="button" data-state="connecting" aria-expanded="false" aria-controls="stats"><span class="dot"></span><span id="conn">Connecting to the homelab...</span><svg class="chevron" viewBox="0 0 10 10" aria-hidden="true"><path d="M3.75 1.5 7.25 5l-3.5 3.5"/></svg></button>
+      <div class="stats" id="stats">
+        <dl class="facts" role="region" aria-label="Live stats">
+          <div><dt>Uptime</dt><dd id="uptime">·</dd></div>
+          <div><dt>Watching now</dt><dd id="watching">·</dd></div>
+          <div><dt title="Requests to glassbox since this app started">Glassbox requests</dt><dd id="requests">·</dd></div>
+          <div><dt>Glassbox · last 60s</dt><dd id="rpm">·</dd></div>
+        </dl>
+      </div>
+    </div>
+
+    <!-- Each page is a view. Links between them swap views in place, and the glass box
+         stays in the page (hidden) so its stream, btop and chat keep running -->
+    <div class="view" data-path="/" data-title="Glass box · Emanuel Correia's homelab, live">
     <section class="hero">
-      <p class="status" data-state="connecting"><span class="dot"></span><span id="conn">Connecting to the homelab...</span></p>
       <h1>This page is the server.<br><span class="muted">Live from a cupboard in Norfolk, UK.</span></h1>
     </section>
 
-    <section class="stage" aria-label="Ask the homelab, its live stats, btop, containers and recent commits">
-      <div class="top">
+    <section class="stage" aria-label="Ask the homelab, btop, containers and recent commits">
       <div class="window">
         <div class="ask">
           <div class="ask-log" id="ask-log" aria-live="polite">
@@ -45,16 +58,6 @@
           </form>
           <p class="ask-keys">↵ to send · /help</p>
         </div>
-      </div>
-
-      <div class="window stats">
-        <dl class="facts cli" role="region" aria-label="Live stats">
-          <div><dt>Uptime</dt><dd id="uptime">·</dd></div>
-          <div><dt>Watching now</dt><dd id="watching">·</dd></div>
-          <div><dt title="Requests to glassbox since this app started">Glassbox requests</dt><dd id="requests">·</dd></div>
-          <div><dt>Glassbox · last 60s</dt><dd id="rpm">·</dd></div>
-        </dl>
-      </div>
       </div>
 
       <div class="window">
@@ -77,22 +80,13 @@
         </div>
       </div>
     </section>
-
-    <section>
-      <h2>How this works</h2>
-      <ul class="how">
-        <li><strong>Ask the homelab.</strong> Qwen3.5-4B runs on its CPU with llama.cpp, one answer at a time, and only knows a short page of facts about me. Questions are not stored.</li>
-        <li><strong>The real btop.</strong> One copy runs on the homelab in a pseudo-terminal. Its output goes to every viewer over Server-Sent Events and is drawn by xterm.js, so a hundred visitors cost the same as one.</li>
-        <li><strong>View only.</strong> Nothing you type or click reaches it, and the process list is switched off so no program names leak.</li>
-        <li><strong>Locked down.</strong> Every container is read-only with no Linux capabilities, and Docker is only visible through a proxy that allows two read-only calls.</li>
-        <li><strong>No open ports.</strong> Traffic reaches the box through an outbound Cloudflare tunnel. No cookies, no analytics, nothing stored about you.</li>
-      </ul>
-      <p class="spec">Dell OptiPlex 3060 Micro · Intel Core i5-8500T, 6 cores · 8 GB DDR4 · 250 GB SSD · CachyOS Linux · Docker</p>
-    </section>
+    </div>
+    <!--views-->
   </main>
 
   <footer>
     <span>© <span id="year"></span> Emanuel Correia</span>
+    <span class="spec">Dell OptiPlex 3060 Micro · Intel Core i5-8500T, 6 cores · 8 GB DDR4 · 250 GB SSD · CachyOS Linux · Docker</span>
     <span class="muted">Self-hosted in the UK</span>
   </footer>
 

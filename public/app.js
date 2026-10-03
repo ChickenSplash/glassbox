@@ -48,7 +48,8 @@ let term = null;
 // xterm's cells snap to device pixels, so render just larger than the frame and
 // shrink slightly; enlarging small rasterised glyphs made the old view blurry.
 function fit() {
-  if (!term) return;
+  // Hidden behind another page: fitted when shown, since the stage's width changes
+  if (!term || !box.clientWidth) return;
   const pad = parseFloat(getComputedStyle(root).getPropertyValue("--term-pad"));
   const width = box.clientWidth - pad * 2;
   const screen = box.querySelector(".xterm-screen");
@@ -330,6 +331,15 @@ function setStatus(state, text) {
   $("conn").textContent = text;
 }
 
+// The status pill slides the live stats out from under it
+const stats = $("stats");
+stats.inert = true;
+status.addEventListener("click", () => {
+  const open = stats.classList.toggle("open");
+  status.setAttribute("aria-expanded", open);
+  stats.inert = !open;
+});
+
 let ready = null;
 
 function connect() {
@@ -375,3 +385,103 @@ function connect() {
 }
 
 connect();
+
+// ---------------------------------------------------------------- pages
+
+// Links within the site swap the view in place, like Livewire's wire:navigate: the
+// header, footer and live pill stay put and only the content changes. A view is
+// fetched once, then kept in the page hidden, so coming back to it is instant.
+const main = document.querySelector("main");
+const viewFor = (pathname) => main.querySelector(`.view[data-path="${CSS.escape(pathname)}"]`);
+
+function show(view) {
+  for (const other of main.querySelectorAll(".view")) other.hidden = other !== view;
+  document.title = view.dataset.title;
+  for (const link of document.querySelectorAll(".nav nav a")) {
+    if (link.pathname === view.dataset.path && link.origin === location.origin) link.setAttribute("aria-current", "page");
+    else link.removeAttribute("aria-current");
+  }
+}
+
+async function navigate(pathname, push) {
+  let view = viewFor(pathname);
+  if (!view) {
+    const response = await fetch(pathname);
+    if (!response.ok) throw new Error(response.status);
+    const page = new DOMParser().parseFromString(await response.text(), "text/html");
+    view = page.querySelector(`.view[data-path="${CSS.escape(pathname)}"]`);
+    if (!view) throw new Error("No view");
+    // Fetching takes a moment, so a later click may have added it already
+    view = viewFor(pathname) || main.appendChild(document.adoptNode(view));
+  }
+  // window's, since history here is the chat's
+  if (push) window.history.pushState(null, "", pathname);
+  show(view);
+  if (push) window.scrollTo(0, 0);
+}
+
+document.addEventListener("click", (event) => {
+  const link = event.target.closest("a[href]");
+  if (!link || event.defaultPrevented || event.button !== 0 || link.target) return;
+  if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+  if (link.origin !== location.origin || link.hash || /\.\w+$/.test(link.pathname)) return;
+  event.preventDefault();
+  if (link.pathname === location.pathname) return window.scrollTo({ top: 0, behavior: "smooth" });
+  // Anything unexpected falls back to a normal page load
+  navigate(link.pathname, true).catch(() => { location.href = link.href; });
+});
+
+addEventListener("popstate", () => navigate(location.pathname, false).catch(() => location.reload()));
+show(viewFor(location.pathname) || viewFor("/"));
+
+// ---------------------------------------------------------------- contact
+
+// The portfolio's contact form posts to /api/contact, which the server forwards to
+// projects-panel. Listened for on the document, since the view can arrive later.
+document.addEventListener("submit", async (event) => {
+  const form = event.target.closest(".contact-form");
+  if (!form) return;
+  event.preventDefault();
+  const note = form.querySelector(".form-status");
+  const submit = form.querySelector("button[type=submit]");
+  const say = (text, kind = "") => {
+    note.textContent = text;
+    note.className = `form-status ${kind}`;
+  };
+
+  form.querySelectorAll(".invalid").forEach((field) => field.classList.remove("invalid"));
+  const invalid = [...form.querySelectorAll("input[required], textarea[required]")].filter((field) => !field.checkValidity());
+  if (invalid.length) {
+    invalid.forEach((field) => field.classList.add("invalid"));
+    invalid[0].focus();
+    return say("Please fill in every field with a valid email.", "error");
+  }
+
+  submit.disabled = true;
+  submit.textContent = "Sending...";
+  say("");
+  try {
+    const response = await fetch(form.action, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify(Object.fromEntries(new FormData(form))),
+    });
+    if (response.ok) {
+      form.reset();
+      say("Thanks, your message is on its way.", "ok");
+    } else if (response.status === 422) {
+      const { errors = {} } = await response.json();
+      Object.keys(errors).forEach((name) => form.elements[name]?.classList.add("invalid"));
+      say(Object.values(errors)[0]?.[0] || "Please check the form.", "error");
+    } else if (response.status === 429) {
+      say("Too many messages, please try again in a minute.", "error");
+    } else {
+      throw new Error(response.status);
+    }
+  } catch (e) {
+    say("Something went wrong. Please try again later.", "error");
+  } finally {
+    submit.disabled = false;
+    submit.textContent = "Send message";
+  }
+});

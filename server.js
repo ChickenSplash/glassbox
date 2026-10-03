@@ -22,6 +22,7 @@ const THEME_DIR = process.env.THEME_DIR || "/theme";
 // validates and applies
 const THEME_CHOICE = process.env.THEME_CHOICE || "/theme-choice/theme";
 const LLM = process.env.LLM || "http://llm:8080";
+const CONTACT = process.env.CONTACT || "http://project-panel:3000";
 const FACTS = process.env.FACTS || path.join(__dirname, "ask/facts.md");
 const PROMPT = process.env.PROMPT || path.join(__dirname, "ask/prompt.md");
 const COLS = Number(process.env.BTOP_COLS || 120);
@@ -712,7 +713,7 @@ function serve(route, file) {
   files.set(route, { body: fs.readFileSync(file), type: types[path.extname(file)] || "application/octet-stream" });
 }
 for (const name of fs.readdirSync(path.join(__dirname, "public"))) {
-  if (name === "fonts") continue;
+  if (name === "fonts" || name === "views") continue;
   serve(name === "index.html" ? "/" : `/${name}`, path.join(__dirname, "public", name));
 }
 // Adwaita Mono (OFL, licence alongside), cut down to the characters the chat uses
@@ -736,12 +737,71 @@ serve("/vendor/addon-webgl.js", require.resolve("@xterm/addon-webgl/lib/addon-we
   index.body = Buffer.from(html);
 }
 
+// Other pages are views (public/views/<name>.html, served at /<name>) put into the
+// glass box page, which stays in it hidden, so the page script and stream always work
+const views = new Map();
+for (const name of fs.readdirSync(path.join(__dirname, "public/views"))) {
+  if (name.endsWith(".html")) views.set(`/${path.basename(name, ".html")}`, fs.readFileSync(path.join(__dirname, "public/views", name), "utf8"));
+}
+
+function page(pathname) {
+  let html = files.get("/").body.toString().replace("<!--palette-->", `<style id="palette">${themeCss}</style>`);
+  const view = views.get(pathname);
+  if (!view) return Buffer.from(html.replace("<!--views-->", ""));
+  const title = view.match(/data-title="([^"]*)"/)[1];
+  html = html
+    .replace(/<title>.*<\/title>/, `<title>${title}</title>`)
+    .replace('<div class="view" data-path="/"', '<div class="view" data-path="/" hidden')
+    .replace("<!--views-->", view.trim());
+  return Buffer.from(html);
+}
+
+// The portfolio's contact form, forwarded to projects-panel, which stores and emails it
+function contact(req, res) {
+  const forward = http.request(`${CONTACT}/api/contact`, {
+    method: "POST",
+    headers: {
+      Host: req.headers.host,
+      "Content-Type": req.headers["content-type"] || "application/json",
+      Accept: "application/json",
+      // cloudflared passes the visitor's IP in CF-Connecting-IP; Laravel rate limits on it
+      "X-Forwarded-For": req.headers["cf-connecting-ip"] || req.socket.remoteAddress,
+      "X-Forwarded-Proto": "https",
+    },
+    timeout: 15_000,
+  }, (answer) => {
+    res.writeHead(answer.statusCode, { ...securityHeaders, "Content-Type": answer.headers["content-type"] || "application/json" });
+    answer.pipe(res);
+  });
+  const fail = () => {
+    if (res.headersSent) return res.destroy();
+    res.writeHead(502, { ...securityHeaders, "Content-Type": "application/json" });
+    res.end(JSON.stringify({ error: "The message service is down." }));
+  };
+  forward.on("timeout", () => forward.destroy());
+  forward.on("error", fail);
+
+  let size = 0;
+  req.on("data", (chunk) => {
+    size += chunk.length;
+    if (size <= 32 * 1024) return forward.write(chunk);
+    forward.destroy();
+    req.destroy();
+  });
+  req.on("end", () => forward.end());
+}
+
 const server = http.createServer((req, res) => {
   const url = new URL(req.url, "http://localhost");
   if (url.pathname !== "/healthz" && req.method !== "HEAD") countRequest();
 
   if (url.pathname === "/ask") {
     if (req.method === "POST") return ask(req, res);
+    res.writeHead(405, { Allow: "POST" });
+    return res.end();
+  }
+  if (url.pathname === "/api/contact") {
+    if (req.method === "POST") return contact(req, res);
     res.writeHead(405, { Allow: "POST" });
     return res.end();
   }
@@ -755,14 +815,12 @@ const server = http.createServer((req, res) => {
     return res.end("ok\n");
   }
 
-  const file = files.get(url.pathname);
+  const file = url.pathname === "/" || views.has(url.pathname) ? files.get("/") : files.get(url.pathname);
   if (!file) {
     res.writeHead(404, { "Content-Type": "text/plain" });
     return res.end("Not found\n");
   }
-  const body = url.pathname === "/"
-    ? Buffer.from(file.body.toString().replace("<!--palette-->", `<style id="palette">${themeCss}</style>`))
-    : file.body;
+  const body = file === files.get("/") ? page(url.pathname) : file.body;
   res.writeHead(200, { ...securityHeaders, "Content-Type": file.type, "Cache-Control": "no-cache" });
   res.end(req.method === "HEAD" ? undefined : body);
 });
