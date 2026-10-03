@@ -20,7 +20,7 @@
         </article>
         <article class="project">
           <h3>Task Space</h3>
-          <p>A Rust space simulator that turns task lists into star systems and tasks into planets. Explore a procedurally generated galaxy with simulated orbits, built for both the browser and desktop.</p>
+          <p>A Rust space simulator built around a mathematical model of the Milky Way. Explore procedurally generated stars and planetary systems with simulated orbits, in the browser or on desktop.</p>
           <p class="project-stack">Rust · Bevy · WebAssembly · Axum</p>
           <div class="project-actions">
             <a class="send" href="https://space.chickensplash.dpdns.org" target="_blank" rel="noopener">Explore Task Space ↗</a>
@@ -29,8 +29,9 @@
             <summary class="send" aria-expanded="false">About the project<svg class="chevron" viewBox="0 0 10 10" aria-hidden="true"><path d="M3.75 1.5 7.25 5l-3.5 3.5"/></svg></summary>
             <div class="case-study-content">
             <div class="case-study-copy">
-              <p>Task Space combines a procedurally generated galaxy with a practical task inspector. Lists map to star systems and tasks to planets, with read-only ClickUp integration and fictional demo data.</p>
-              <p>The Rust simulation powers a Bevy client on desktop and in the browser through WebAssembly. The homelab hosts the browser build and its Axum backend; your device handles the rendering.</p>
+              <p><strong>Modelling the galaxy.</strong> Density profiles describe how stars are distributed across the central bulge, spiral arms, discs and halo. Seeded statistical sampling places stars according to those densities, while regional ages and stellar masses produce a mix of main-sequence stars, giants and white dwarfs.</p>
+              <p><strong>Building solar systems.</strong> Each star seeds a repeatable planetary system, with masses and orbital spacing shaped by a simplified formation model. Kepler’s laws set orbital periods, and solving Kepler’s equation gives each planet’s position as simulation time advances.</p>
+              <p><strong>Making it explorable.</strong> Spatial cells generate and stream stars as you travel, rather than storing the entire galaxy. Double-precision maths preserves positions across vast distances. A shared Rust simulation powers the Bevy desktop and WebAssembly clients, with browser generation in a background worker and an Axum backend hosted on the homelab.</p>
             </div>
             </div>
           </details>
