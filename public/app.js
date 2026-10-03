@@ -436,6 +436,33 @@ show(viewFor(location.pathname) || viewFor("/"));
 
 // ---------------------------------------------------------------- contact
 
+// Delegated so copying also works when navigation fetches the portfolio later.
+document.addEventListener("click", async (event) => {
+  const button = event.target.closest(".copy");
+  if (!button) return;
+  const link = button.previousElementSibling;
+  const note = button.closest(".contact").querySelector(".copy-status");
+  if (!/^(mailto|tel):/.test(link.href)) {
+    note.textContent = "Please try again once the contact details have loaded.";
+    return;
+  }
+  const value = decodeURIComponent(link.href.replace(/^(mailto|tel):/, ""));
+  const label = button.getAttribute("aria-label");
+  try {
+    await navigator.clipboard.writeText(value);
+    button.classList.add("copied");
+    button.title = "Copied!";
+    note.textContent = label === "Copy email address" ? "Email address copied." : "Phone number copied.";
+    clearTimeout(button.copyTimer);
+    button.copyTimer = setTimeout(() => {
+      button.classList.remove("copied");
+      button.title = label;
+    }, 1800);
+  } catch (error) {
+    note.textContent = "Couldn’t copy automatically. Select and copy the contact details above.";
+  }
+});
+
 // The portfolio's contact form posts to /api/contact, which the server forwards to
 // projects-panel. Listened for on the document, since the view can arrive later.
 document.addEventListener("submit", async (event) => {

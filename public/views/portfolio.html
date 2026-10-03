@@ -1,6 +1,71 @@
     <div class="view" data-path="/portfolio" data-title="Portfolio · Emanuel Correia">
+    <section class="portfolio-intro" aria-labelledby="portfolio-title">
+      <p class="portfolio-role">Full-stack web developer · Norfolk, UK</p>
+      <h1 id="portfolio-title">Emanuel Correia</h1>
+      <p class="portfolio-bio">I build web applications at Premier Education Group, working across its business management system, learning platform and public website. Outside work, I build personal projects, explore Linux and experiment with AI.</p>
+      <p class="portfolio-stack">Laravel · PHP · Livewire · Filament</p>
+    </section>
+
+    <section class="portfolio-projects" aria-labelledby="projects-title">
+      <h2 id="projects-title">Selected projects</h2>
+      <div class="project-list">
+        <article class="project">
+          <h3>Glass box</h3>
+          <p>A live window into the homelab hosting this site. It streams server activity to your browser and lets you chat with a locally hosted AI that can change the theme for everyone.</p>
+          <p class="project-stack">Node.js · Server-Sent Events · Docker · Linux · llama.cpp</p>
+          <div class="project-actions">
+            <a class="send" href="/">Explore the homelab ↗</a>
+            <a class="project-source" href="https://github.com/ChickenSplash/glassbox" target="_blank" rel="noopener">Source ↗</a>
+          </div>
+        </article>
+        <article class="project">
+          <h3>Task Space</h3>
+          <p>A Rust space simulator that turns task lists into star systems and tasks into planets. Explore a procedurally generated galaxy with simulated orbits, built for both the browser and desktop.</p>
+          <p class="project-stack">Rust · Bevy · WebAssembly · Axum</p>
+          <details class="project-case-study">
+            <summary class="send">About the project</summary>
+            <div class="case-study-copy">
+              <p>Task Space combines a procedurally generated galaxy with a practical task inspector. Lists map to star systems and tasks to planets, with read-only ClickUp integration and fictional demo data.</p>
+              <p>The Rust simulation powers a Bevy client on desktop and in the browser through WebAssembly. The homelab hosts the browser build and its Axum backend; your device handles the rendering.</p>
+            </div>
+          </details>
+        </article>
+        <article class="project">
+          <h3>Holiday camp timetable builder</h3>
+          <p class="project-context">Premier Education Group · BMS feature</p>
+          <p>Parents couldn’t always see what their children would be doing at holiday camp. I built a timetable creator in the BMS so franchisees can create and publish schedules directly to the course booking page.</p>
+          <details class="project-case-study">
+            <summary class="send">Read the case study</summary>
+            <div class="case-study-copy">
+              <p><strong>The problem.</strong> Timetables were created and shared separately by individual franchisees, leaving parents with little information about the day’s activities when booking.</p>
+              <p><strong>My contribution.</strong> I built a timetable creator within the BMS, allowing franchisees to create their own schedules and publish them to the course booking page at the press of a button.</p>
+              <p><strong>The result.</strong> Parents can see the planned activities before booking, while timetable creation and publishing sit within one workflow.</p>
+            </div>
+          </details>
+        </article>
+      </div>
+    </section>
+
     <section class="contact" aria-labelledby="contact-title">
       <h2 id="contact-title">Contact</h2>
+      <p class="contact-note">Have an opportunity, a project or an idea? Get in touch.</p>
+      <div class="contact-actions">
+        <div class="split">
+          <a class="send" href="mailto:guardeded@gmail.com">guardeded@gmail.com</a>
+          <button class="send copy" type="button" aria-label="Copy email address" title="Copy email address">
+            <svg class="icon-copy" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg>
+            <svg class="icon-check" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>
+          </button>
+        </div>
+        <div class="split">
+          <a class="send" href="tel:+447858501493">+44 7858 501493</a>
+          <button class="send copy" type="button" aria-label="Copy phone number" title="Copy phone number">
+            <svg class="icon-copy" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg>
+            <svg class="icon-check" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>
+          </button>
+        </div>
+      </div>
+      <p class="copy-status" role="status" aria-live="polite"></p>
       <div class="window">
         <form class="contact-form" action="/api/contact" method="post" novalidate>
           <div class="field-row">
