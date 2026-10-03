@@ -395,6 +395,17 @@ const main = document.querySelector("main");
 const viewFor = (pathname) => main.querySelector(`.view[data-path="${CSS.escape(pathname)}"]`);
 
 function show(view) {
+  // Cloudflare's decoder runs only on a full page load, not on fetched views.
+  for (const span of view.querySelectorAll("[data-cfemail]")) {
+    const encoded = span.dataset.cfemail;
+    if (!/^(?:[a-f\d]{2})+$/i.test(encoded)) continue;
+    const key = parseInt(encoded.slice(0, 2), 16);
+    const email = encoded.slice(2).match(/../g)?.map((pair) => String.fromCharCode(parseInt(pair, 16) ^ key)).join("");
+    if (!email) continue;
+    const link = span.closest("a");
+    if (link?.getAttribute("href").startsWith("/cdn-cgi/l/email-protection")) link.href = `mailto:${email}`;
+    span.replaceWith(document.createTextNode(email));
+  }
   for (const other of main.querySelectorAll(".view")) other.hidden = other !== view;
   document.title = view.dataset.title;
   for (const link of document.querySelectorAll(".nav nav a")) {
