@@ -22,7 +22,7 @@ const THEME_DIR = process.env.THEME_DIR || "/theme";
 // validates and applies
 const THEME_CHOICE = process.env.THEME_CHOICE || "/theme-choice/theme";
 const LLM = process.env.LLM || "http://llm:8080";
-const CONTACT = process.env.CONTACT || "http://project-panel:3000";
+const CONTACT = process.env.CONTACT || "http://hms:3000";
 const FACTS = process.env.FACTS || path.join(__dirname, "ask/facts.md");
 const PROMPT = process.env.PROMPT || path.join(__dirname, "ask/prompt.md");
 const COLS = Number(process.env.BTOP_COLS || 120);
@@ -756,7 +756,7 @@ function page(pathname) {
   return Buffer.from(html);
 }
 
-// The portfolio's contact form, forwarded to projects-panel, which stores and emails it
+// The portfolio's contact form, forwarded to HMS (the homelab's API), which stores and emails it
 function contact(req, res) {
   const forward = http.request(`${CONTACT}/api/contact`, {
     method: "POST",

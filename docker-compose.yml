@@ -16,7 +16,7 @@ services:
     environment:
       <<: *btop-size
       # Only public repos: commit messages are shown on the page
-      REPOS: glassbox=ChickenSplash/glassbox,projects-panel=ChickenSplash/projects-panel
+      REPOS: glassbox=ChickenSplash/glassbox,hms=ChickenSplash/homelab-management-system
     volumes:
       - btop-socket:/run/btop
       # Read on every question, so edits apply without a rebuild
@@ -28,7 +28,7 @@ services:
       - /home/ecorreia/.config/homelab-theme/choice:/theme-choice
       # Just the .git dirs, so no working tree (or .env) is visible
       - ./.git:/repos/glassbox:ro
-      - ../projects-panel/.git:/repos/projects-panel:ro
+      - ../hms/.git:/repos/hms:ro
     networks: [edge, docker-proxy, llm]
     depends_on: [socket-proxy, btop, llm]
     restart: unless-stopped

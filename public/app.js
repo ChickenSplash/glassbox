@@ -504,7 +504,7 @@ document.addEventListener("click", async (event) => {
 });
 
 // The portfolio's contact form posts to /api/contact, which the server forwards to
-// projects-panel. Listened for on the document, since the view can arrive later.
+// HMS. Listened for on the document, since the view can arrive later.
 document.addEventListener("submit", async (event) => {
   const form = event.target.closest(".contact-form");
   if (!form) return;

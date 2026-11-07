@@ -16,8 +16,8 @@ small model on the same CPU.
   (like Livewire's `wire:navigate`), so the header, footer, live pill and stream stay up,
   and the glass box view is only hidden, never torn down.
 - **Portfolio:** `/portfolio`, for now just the contact form. The app forwards
-  `/api/contact` to [projects-panel](https://github.com/ChickenSplash/projects-panel)
-  (`project-panel:3000` on the `edge` network), which stores and emails the message.
+  `/api/contact` to [HMS](https://github.com/ChickenSplash/homelab-management-system)
+  (`hms:3000` on the `edge` network), which stores and emails the message.
 - **Docker:** reached only through [wollomatic/socket-proxy](https://github.com/wollomatic/socket-proxy),
   allowlisted to listing containers and reading their stats.
 - **Traffic:** counts requests reaching the glassbox app, with a rolling 60-second
